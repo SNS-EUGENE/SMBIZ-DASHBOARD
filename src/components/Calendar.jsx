@@ -22,20 +22,20 @@ const Calendar = ({ selectedDate, onDateSelect }) => {
     setCurrentMonth(addMonths(currentMonth, 1))
   }
 
-  // Day cell styling
+  // Day cell styling - macOS/iOS inspired
   const getDayClass = (day) => {
-    let classes = 'w-full aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer'
+    let classes = 'w-12 h-12 flex items-center justify-center rounded-full text-base font-medium transition-all duration-200 cursor-pointer'
 
-    if (isToday(day)) {
-      classes += ' ring-1 ring-primary/50'
+    if (isToday(day) && !isSameDay(day, selectedDate)) {
+      classes += ' ring-2 ring-primary/40'
     }
 
     if (isSameDay(day, selectedDate)) {
-      classes += ' bg-primary text-white shadow-md'
+      classes += ' bg-primary text-white shadow-lg scale-105'
     } else if (!isSameMonth(day, currentMonth)) {
       classes += ' text-text-muted opacity-30'
     } else {
-      classes += ' text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
+      classes += ' text-text-primary hover:bg-bg-tertiary hover:scale-105'
     }
 
     return classes
@@ -44,36 +44,40 @@ const Calendar = ({ selectedDate, onDateSelect }) => {
   const weekDays = ['일', '월', '화', '수', '목', '금', '토']
 
   return (
-    <div className="select-none">
+    <div className="select-none w-[400px] p-4">
       {/* Month Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-6">
         <button
           onClick={handlePrevMonth}
-          className="p-2 rounded-lg hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all"
+          className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all"
           aria-label="이전 달"
         >
-          ←
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
 
-        <h2 className="text-base font-semibold text-text-primary">
+        <h2 className="text-lg font-semibold text-text-primary">
           {format(currentMonth, 'yyyy년 M월', { locale: ko })}
         </h2>
 
         <button
           onClick={handleNextMonth}
-          className="p-2 rounded-lg hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all"
+          className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all"
           aria-label="다음 달"
         >
-          →
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
       </div>
 
       {/* Week Days */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
+      <div className="grid grid-cols-7 gap-2 mb-3">
         {weekDays.map((day, index) => (
           <div
             key={day}
-            className={`text-center text-xs font-semibold py-2 ${
+            className={`text-center text-sm font-semibold py-2 ${
               index === 0 ? 'text-danger' : index === 6 ? 'text-primary' : 'text-text-tertiary'
             }`}
           >
@@ -83,10 +87,10 @@ const Calendar = ({ selectedDate, onDateSelect }) => {
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-2">
         {/* Empty cells for days before month start */}
         {Array.from({ length: firstDayOfWeek }).map((_, index) => (
-          <div key={`empty-${index}`} className="aspect-square" />
+          <div key={`empty-${index}`} className="w-12 h-12" />
         ))}
 
         {/* Days of the month */}

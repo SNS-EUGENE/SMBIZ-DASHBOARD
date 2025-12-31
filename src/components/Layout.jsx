@@ -1,24 +1,8 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const Layout = () => {
-  const [currentTime, setCurrentTime] = useState(new Date())
-
-  // Update time every second
-  useState(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
-  }
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
 
   const navLinks = [
     { path: '/main', label: '예약 현황', icon: '📅' },
@@ -28,43 +12,67 @@ const Layout = () => {
 
   return (
     <div className="min-h-screen flex">
-      {/* Sidebar - Raycast Style */}
-      <aside className="w-64 bg-bg-secondary border-r border-border flex flex-col">
+      {/* Sidebar - Enhanced macOS glassmorphism */}
+      <aside
+        className={`bg-bg-secondary/50 backdrop-blur-2xl border-r border-border flex flex-col transition-all duration-300 shadow-sm ${
+          isSidebarCollapsed ? 'w-16' : 'w-64'
+        }`}
+      >
         {/* Logo */}
-        <div className="p-6 border-b border-border">
-          <h1 className="text-xl font-bold text-text-primary">
-            SMBIZ
-          </h1>
-          <p className="text-xs text-text-tertiary mt-1">디지털 콘텐츠 제작실</p>
+        <div className="px-4 py-5 border-b border-border flex items-center justify-between">
+          {!isSidebarCollapsed && (
+            <div>
+              <h1 className="text-lg font-bold text-text-primary tracking-tight">
+                SMBIZ
+              </h1>
+              <p className="text-xs text-text-tertiary mt-0.5">디지털 콘텐츠 제작실</p>
+            </div>
+          )}
+          {isSidebarCollapsed && (
+            <div className="text-center w-full">
+              <h1 className="text-base font-bold text-text-primary">S</h1>
+            </div>
+          )}
         </div>
 
+        {/* Toggle Button */}
+        <button
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="mx-2 my-2 p-2 hover:bg-bg-tertiary rounded-md transition-all text-text-secondary hover:text-text-primary"
+          aria-label={isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+        >
+          {isSidebarCollapsed ? (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
+        </button>
+
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-2 space-y-0.5">
           {navLinks.map((link) => (
             <NavLink
               key={link.path}
               to={link.path}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                `flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200
                 ${isActive
-                  ? 'bg-primary text-white shadow-md'
+                  ? 'bg-primary/15 text-primary shadow-sm'
                   : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
-                }`
+                }
+                ${isSidebarCollapsed ? 'justify-center' : ''}`
               }
+              title={isSidebarCollapsed ? link.label : ''}
             >
-              <span className="text-lg">{link.icon}</span>
-              <span className="font-medium">{link.label}</span>
+              <span className="text-base">{link.icon}</span>
+              {!isSidebarCollapsed && <span className="font-medium text-sm">{link.label}</span>}
             </NavLink>
           ))}
         </nav>
-
-        {/* Footer Info */}
-        <div className="p-4 border-t border-border">
-          <div className="flex items-center justify-between text-xs text-text-tertiary">
-            <span>{new Date().toLocaleDateString('ko-KR')}</span>
-            <span className="font-mono">{formatTime(currentTime)}</span>
-          </div>
-        </div>
       </aside>
 
       {/* Main Content */}

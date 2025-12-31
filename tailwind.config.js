@@ -14,25 +14,25 @@ export default {
           light: 'rgba(255, 99, 99, 0.1)',
           dark: '#CC4F4F',
         },
-        // Background
+        // Background - macOS style with better hierarchy
         bg: {
-          primary: '#0D0D0D',
-          secondary: '#1A1A1A',
-          tertiary: '#242424',
-          elevated: '#2D2D2D',
-          hover: '#313131',
+          primary: '#0F0F0F',
+          secondary: '#1C1C1E',
+          tertiary: '#2C2C2E',
+          elevated: '#3A3A3C',
+          hover: '#48484A',
         },
-        // Text
+        // Text - Improved contrast for glassmorphism
         text: {
           primary: '#FFFFFF',
-          secondary: '#A8A8A8',
-          tertiary: '#6B6B6B',
-          muted: '#4A4A4A',
+          secondary: '#EBEBF5',
+          tertiary: '#8E8E93',
+          muted: '#636366',
         },
-        // Border
+        // Border - Subtle glassmorphism borders
         border: {
-          DEFAULT: '#2D2D2D',
-          hover: '#3D3D3D',
+          DEFAULT: 'rgba(255, 255, 255, 0.1)',
+          hover: 'rgba(255, 255, 255, 0.15)',
           focus: '#FF6363',
         },
         // Status
@@ -51,8 +51,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'monospace'],
+        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+        mono: ['SF Mono', 'Monaco', 'Menlo', 'monospace'],
       },
       fontSize: {
         'xs': ['0.75rem', { lineHeight: '1rem' }],
@@ -77,17 +77,19 @@ export default {
         'xl': '1.5rem',
       },
       boxShadow: {
-        'sm': '0 1px 2px 0 rgba(0, 0, 0, 0.25)',
-        'DEFAULT': '0 2px 8px 0 rgba(0, 0, 0, 0.3)',
-        'md': '0 4px 16px 0 rgba(0, 0, 0, 0.35)',
-        'lg': '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
-        'xl': '0 12px 48px 0 rgba(0, 0, 0, 0.45)',
+        'sm': '0 1px 3px 0 rgba(0, 0, 0, 0.3)',
+        'DEFAULT': '0 2px 8px 0 rgba(0, 0, 0, 0.4)',
+        'md': '0 4px 12px 0 rgba(0, 0, 0, 0.5)',
+        'lg': '0 8px 24px 0 rgba(0, 0, 0, 0.6)',
+        'xl': '0 12px 36px 0 rgba(0, 0, 0, 0.7)',
+        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-down': 'slideDown 0.3s ease-out',
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'spin-slow': 'spin 2s linear infinite',
       },
       keyframes: {
         fadeIn: {
@@ -101,6 +103,10 @@ export default {
         slideDown: {
           '0%': { transform: 'translateY(-10px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        spin: {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
         },
       },
     },

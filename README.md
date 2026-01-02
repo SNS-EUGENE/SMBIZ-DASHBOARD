@@ -50,7 +50,11 @@ smbiz-dashboard/
 │   ├── components/          # 재사용 가능한 컴포넌트
 │   │   ├── Layout.jsx       # 레이아웃 (사이드바 + 메인)
 │   │   ├── Calendar.jsx     # 달력 컴포넌트
-│   │   └── TimelineView.jsx # 타임라인 뷰
+│   │   ├── TimelineView.jsx # 타임라인 뷰
+│   │   ├── Modal.jsx        # 모달 컴포넌트
+│   │   ├── Toast.jsx        # 토스트 알림
+│   │   ├── ReservationForm.jsx  # 예약 폼
+│   │   └── CompanyForm.jsx  # 기업 폼
 │   ├── pages/               # 페이지 컴포넌트
 │   │   ├── MainPage.jsx     # 예약 현황 (메인)
 │   │   ├── StatsPage.jsx    # 통계 대시보드
@@ -61,6 +65,11 @@ smbiz-dashboard/
 │   │   └── index.css        # Tailwind + 커스텀 스타일
 │   ├── App.jsx              # 앱 라우터
 │   └── main.jsx             # 엔트리 포인트
+├── chrome-extension/        # SMBIZ 데이터 추출 확장 프로그램
+│   ├── manifest.json        # 확장 프로그램 설정
+│   ├── content.js           # 페이지 데이터 추출 스크립트
+│   ├── popup.html/js        # 팝업 UI
+│   └── icons/               # 아이콘
 ├── database-schema.sql      # 데이터베이스 스키마
 ├── package.json
 ├── vite.config.js
@@ -97,9 +106,24 @@ smbiz-dashboard/
 
 ### ⚙️ 관리자 페이지
 - **기업 관리**: CRUD 기능
-- **예약 관리**: 예약 생성/수정/취소
+- **예약 관리**: 예약 생성/수정/취소/노쇼 처리
 - **장비 관리**: 장비 상태 관리
 - **데이터 필터링**: 고급 검색 및 필터
+- **CSV 내보내기**: 데이터 다운로드
+
+### 🔌 Chrome Extension
+SMBIZ 관리자 페이지(smbiz.sba.kr)에서 예약 데이터를 추출하여 Dashboard에 자동 입력
+
+**설치 방법**:
+1. Chrome에서 `chrome://extensions` 접속
+2. "개발자 모드" 활성화
+3. "압축해제된 확장 프로그램을 로드합니다" 클릭
+4. `chrome-extension` 폴더 선택
+
+**사용 방법**:
+1. smbiz.sba.kr 예약 상세 페이지에서 "SMBIZ Dashboard로 복사" 버튼 클릭
+2. Dashboard 예약 추가 폼에서 "SMBIZ 붙여넣기" 버튼 클릭
+3. 기업 정보 자동 매칭 및 폼 자동 입력
 
 ## 🎨 디자인 시스템
 
@@ -154,12 +178,23 @@ Danger: #FF6B6B
 - 데스크탑 최적화 (1920px 기준)
 - 태블릿 대응 (768px+)
 
+## ✅ 완료된 기능
+
+- [x] 예약 생성/수정/삭제 모달
+- [x] 기업 CRUD (생성/수정/삭제)
+- [x] 장비 관리
+- [x] 통계 페이지 (차트, 필터, CSV 내보내기)
+- [x] 노쇼(No-Show) 처리 기능
+- [x] 커스텀 확인 모달 (브라우저 confirm 대체)
+- [x] Toast 알림 시스템
+- [x] 에러 바운더리
+- [x] Chrome Extension (SMBIZ 데이터 추출)
+- [x] 클립보드 붙여넣기로 예약 데이터 자동 입력
+
 ## 🚧 개발 중인 기능
 
-- [ ] 예약 생성 모달
 - [ ] 드래그 앤 드롭 예약 변경
 - [ ] 실시간 알림
-- [ ] Excel 데이터 임포트
 - [ ] PDF 리포트 생성
 
 ## 📝 라이센스

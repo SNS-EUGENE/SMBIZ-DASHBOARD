@@ -74,11 +74,13 @@ function getTimeSlot(startTime, endTime) {
   return 'morning'
 }
 
-// 장비 옵션 파싱 (줄바꿈으로 구분된 장비 리스트)
+// 장비 옵션 파싱 (슬래시, 줄바꿈, 또는 Windows 줄바꿈으로 구분된 장비 리스트)
 function parseEquipmentOptions(optionsStr) {
   if (!optionsStr) return []
+
+  // 슬래시(/), 줄바꿈(\n), Windows 줄바꿈(\r\n) 모두 지원
   return optionsStr
-    .split('\n')
+    .split(/\s*\/\s*|\r?\n+/)
     .map(t => t.trim())
     .filter(Boolean)
     .map(t => equipmentTypeMapping[t] || t)
@@ -331,8 +333,16 @@ async function uploadData() {
     for (let i = 0; i < reservationsData.length; i += batchSize) {
       const batch = reservationsData.slice(i, i + batchSize)
 
-      const reservations = batch.map(r => ({
-        company_id: companyIdMap.get(r.company_name),
+      // company_id와 equipment_types를 함께 매핑
+      const batchWithCompanyId = batch.map(r => ({
+        ...r,
+        company_id: companyIdMap.get(r.company_name)
+      })).filter(r => r.company_id)
+
+      if (batchWithCompanyId.length === 0) continue
+
+      const reservations = batchWithCompanyId.map(r => ({
+        company_id: r.company_id,
         reservation_date: r.reservation_date,
         time_slot: r.time_slot,
         work_2d: r.photo_2d,
@@ -344,9 +354,7 @@ async function uploadData() {
         is_seminar: r.is_seminar,
         notes: r.notes,
         status: r.status
-      })).filter(r => r.company_id)
-
-      if (reservations.length === 0) continue
+      }))
 
       const { data: insertedReservations, error: resError } = await supabase
         .from('reservations')
@@ -358,19 +366,40 @@ async function uploadData() {
         continue
       }
 
-      allInsertedReservations.push(...insertedReservations.map((r, idx) => ({
-        ...r,
-        equipment_types: batch[idx].equipment_types
-      })))
+      // insertedReservations와 batchWithCompanyId를 매칭 (순서 보장 안 될 수 있음)
+      insertedReservations.forEach(inserted => {
+        const original = batchWithCompanyId.find(b =>
+          b.company_id === inserted.company_id &&
+          b.reservation_date === inserted.reservation_date &&
+          b.time_slot === inserted.time_slot
+        )
+        if (original) {
+          allInsertedReservations.push({
+            ...inserted,
+            equipment_types: original.equipment_types
+          })
+        } else {
+          // 디버깅: 매칭 안 되는 경우
+          console.log('\n⚠️ 매칭 실패:', inserted.reservation_date, inserted.time_slot)
+        }
+      })
 
       uploadedCount += reservations.length
       process.stdout.write(`\r   진행: ${uploadedCount} / ${reservationsData.length}`)
     }
 
     console.log('\n✅ 예약 데이터 업로드 완료\n')
+    console.log(`   allInsertedReservations: ${allInsertedReservations.length}개`)
+
+    // 디버깅: 5월 16일 데이터 확인
+    const may16 = allInsertedReservations.filter(r => r.reservation_date === '2025-05-16')
+    console.log(`   5월 16일 예약: ${may16.length}개`)
+    may16.forEach(r => {
+      console.log(`   - ${r.time_slot}: equipment_types = ${JSON.stringify(r.equipment_types)}`)
+    })
 
     // 5-5. 예약-장비 매핑 업로드
-    console.log('📤 [3/3] 예약-장비 매핑 데이터 업로드 중...')
+    console.log('\n📤 [3/3] 예약-장비 매핑 데이터 업로드 중...')
 
     const mappings = []
     allInsertedReservations.forEach(reservation => {
@@ -389,11 +418,24 @@ async function uploadData() {
     })
 
     if (mappings.length > 0) {
+      // 중복 제거 (같은 reservation_id + equipment_id 조합)
+      const uniqueMappings = []
+      const seen = new Set()
+      mappings.forEach(m => {
+        const key = `${m.reservation_id}-${m.equipment_id}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          uniqueMappings.push(m)
+        }
+      })
+
+      console.log(`   (중복 제거: ${mappings.length} -> ${uniqueMappings.length}개)`)
+
       const mappingBatchSize = 500
       let mappingUploadedCount = 0
 
-      for (let i = 0; i < mappings.length; i += mappingBatchSize) {
-        const batch = mappings.slice(i, i + mappingBatchSize)
+      for (let i = 0; i < uniqueMappings.length; i += mappingBatchSize) {
+        const batch = uniqueMappings.slice(i, i + mappingBatchSize)
 
         const { error: mapError } = await supabase
           .from('reservation_equipment')
@@ -405,7 +447,7 @@ async function uploadData() {
         }
 
         mappingUploadedCount += batch.length
-        process.stdout.write(`\r   진행: ${mappingUploadedCount} / ${mappings.length}`)
+        process.stdout.write(`\r   진행: ${mappingUploadedCount} / ${uniqueMappings.length}`)
       }
 
       console.log('\n✅ 예약-장비 매핑 업로드 완료\n')

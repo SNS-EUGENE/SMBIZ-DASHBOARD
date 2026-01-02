@@ -1,13 +1,25 @@
 import { useState, useEffect } from 'react'
+import { format } from 'date-fns'
+import { ko } from 'date-fns/locale'
 import { api } from '../lib/supabase'
+import Modal from '../components/Modal'
+import ReservationForm from '../components/ReservationForm'
+import CompanyForm from '../components/CompanyForm'
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('companies')
   const [companies, setCompanies] = useState([])
+  const [blockedCompanies, setBlockedCompanies] = useState([])
   const [reservations, setReservations] = useState([])
   const [equipment, setEquipment] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Modal states
+  const [showReservationModal, setShowReservationModal] = useState(false)
+  const [showCompanyModal, setShowCompanyModal] = useState(false)
+  const [editingReservation, setEditingReservation] = useState(null)
+  const [editingCompany, setEditingCompany] = useState(null)
 
   useEffect(() => {
     fetchData()
@@ -19,6 +31,9 @@ const AdminPage = () => {
     if (activeTab === 'companies') {
       const { data } = await api.companies.getAll()
       setCompanies(data || [])
+    } else if (activeTab === 'blocked') {
+      const { data } = await api.companies.getBlocked()
+      setBlockedCompanies(data || [])
     } else if (activeTab === 'reservations') {
       const { data } = await api.reservations.getAll()
       setReservations(data || [])
@@ -30,8 +45,119 @@ const AdminPage = () => {
     setLoading(false)
   }
 
+  const handleNoShow = async (reservationId, companyId) => {
+    if (!confirm('이 예약을 노쇼 처리하시겠습니까?\n해당 기업은 1주일간 예약이 제한됩니다.')) {
+      return
+    }
+
+    const { error } = await api.reservations.markNoShow(reservationId, companyId)
+    if (error) {
+      alert('노쇼 처리 실패: ' + error.message)
+    } else {
+      alert('노쇼 처리되었습니다. 해당 기업은 1주일간 예약이 제한됩니다.')
+      fetchData()
+    }
+  }
+
+  const handleUnblock = async (companyId) => {
+    if (!confirm('이 기업의 예약 제한을 해제하시겠습니까?')) {
+      return
+    }
+
+    const { error } = await api.companies.unblock(companyId)
+    if (error) {
+      alert('차단 해제 실패: ' + error.message)
+    } else {
+      alert('예약 제한이 해제되었습니다.')
+      fetchData()
+    }
+  }
+
+  // Reservation CRUD handlers
+  const handleAddReservation = () => {
+    setEditingReservation(null)
+    setShowReservationModal(true)
+  }
+
+  const handleEditReservation = (reservation) => {
+    setEditingReservation(reservation)
+    setShowReservationModal(true)
+  }
+
+  const handleReservationSaved = () => {
+    setShowReservationModal(false)
+    setEditingReservation(null)
+    fetchData()
+  }
+
+  const handleCancelReservation = async (id) => {
+    if (!confirm('이 예약을 취소하시겠습니까?')) {
+      return
+    }
+
+    const { error } = await api.reservations.cancel(id)
+    if (error) {
+      alert('예약 취소 실패: ' + error.message)
+    } else {
+      fetchData()
+    }
+  }
+
+  const handleDeleteReservation = async (id) => {
+    if (!confirm('이 예약을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+      return
+    }
+
+    const { error } = await api.reservations.delete(id)
+    if (error) {
+      alert('예약 삭제 실패: ' + error.message)
+    } else {
+      fetchData()
+    }
+  }
+
+  // Company CRUD handlers
+  const handleAddCompany = () => {
+    setEditingCompany(null)
+    setShowCompanyModal(true)
+  }
+
+  const handleEditCompany = (company) => {
+    setEditingCompany(company)
+    setShowCompanyModal(true)
+  }
+
+  const handleCompanySaved = () => {
+    setShowCompanyModal(false)
+    setEditingCompany(null)
+    fetchData()
+  }
+
+  const handleDeleteCompany = async (id) => {
+    if (!confirm('이 기업을 삭제하시겠습니까? 관련된 모든 예약도 삭제됩니다.')) {
+      return
+    }
+
+    const { error } = await api.companies.delete(id)
+    if (error) {
+      alert('기업 삭제 실패: ' + error.message)
+    } else {
+      fetchData()
+    }
+  }
+
+  // "새로 만들기" 버튼 핸들러
+  const handleCreate = () => {
+    if (activeTab === 'companies') {
+      handleAddCompany()
+    } else if (activeTab === 'reservations') {
+      handleAddReservation()
+    }
+  }
+
   const tabs = [
     { id: 'companies', label: '기업 관리', icon: '🏢', count: companies.length },
+    { id: 'blocked', label: '차단 기업', icon: '🚫', count: blockedCompanies.length },
     { id: 'reservations', label: '예약 관리', icon: '📅', count: reservations.length },
     { id: 'equipment', label: '장비 관리', icon: '🔧', count: equipment.length },
   ]
@@ -95,8 +221,18 @@ const AdminPage = () => {
                 <td>{company.district}</td>
                 <td>
                   <div className="flex items-center gap-2">
-                    <button className="btn-ghost text-xs px-2 py-1">수정</button>
-                    <button className="btn-ghost text-xs px-2 py-1 text-danger">삭제</button>
+                    <button
+                      onClick={() => handleEditCompany(company)}
+                      className="btn-ghost text-xs px-2 py-1"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCompany(company.id)}
+                      className="btn-ghost text-xs px-2 py-1 text-danger"
+                    >
+                      삭제
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -122,6 +258,7 @@ const AdminPage = () => {
       pending: { label: '대기', class: 'badge-warning' },
       completed: { label: '완료', class: 'badge-primary' },
       cancelled: { label: '취소', class: 'badge-danger' },
+      no_show: { label: '노쇼', class: 'bg-red-900/50 text-red-300 border-red-500/30' },
     }
 
     return (
@@ -141,7 +278,7 @@ const AdminPage = () => {
           </thead>
           <tbody>
             {filteredData.map((reservation) => (
-              <tr key={reservation.id}>
+              <tr key={reservation.id} className={reservation.status === 'no_show' ? 'bg-red-900/10' : ''}>
                 <td className="font-mono text-sm">{reservation.reservation_date}</td>
                 <td>
                   <span className={`badge ${
@@ -174,8 +311,28 @@ const AdminPage = () => {
                 </td>
                 <td>
                   <div className="flex items-center gap-2">
-                    <button className="btn-ghost text-xs px-2 py-1">수정</button>
-                    <button className="btn-ghost text-xs px-2 py-1 text-danger">취소</button>
+                    {reservation.status === 'confirmed' && (
+                      <button
+                        onClick={() => handleNoShow(reservation.id, reservation.company_id)}
+                        className="btn-ghost text-xs px-2 py-1 text-warning hover:bg-warning/20"
+                      >
+                        노쇼
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleEditReservation(reservation)}
+                      className="btn-ghost text-xs px-2 py-1"
+                    >
+                      수정
+                    </button>
+                    {reservation.status !== 'cancelled' && reservation.status !== 'no_show' && (
+                      <button
+                        onClick={() => handleCancelReservation(reservation.id)}
+                        className="btn-ghost text-xs px-2 py-1 text-danger"
+                      >
+                        취소
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -186,6 +343,63 @@ const AdminPage = () => {
         {filteredData.length === 0 && (
           <div className="text-center py-12 text-text-tertiary">
             검색 결과가 없습니다.
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Blocked Companies Table
+  const BlockedCompaniesTable = () => {
+    return (
+      <div className="overflow-x-auto">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>기업명</th>
+              <th>대표자</th>
+              <th>연락처</th>
+              <th>차단 해제일</th>
+              <th>남은 기간</th>
+              <th>작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            {blockedCompanies.map((company) => {
+              const blockedUntil = new Date(company.blocked_until)
+              const now = new Date()
+              const daysRemaining = Math.ceil((blockedUntil - now) / (1000 * 60 * 60 * 24))
+
+              return (
+                <tr key={company.id} className="bg-red-900/5">
+                  <td className="font-semibold">{company.name}</td>
+                  <td>{company.representative || '-'}</td>
+                  <td className="text-sm">{company.contact || '-'}</td>
+                  <td className="font-mono text-sm">
+                    {format(blockedUntil, 'yyyy-MM-dd HH:mm', { locale: ko })}
+                  </td>
+                  <td>
+                    <span className="badge bg-red-900/50 text-red-300 border-red-500/30">
+                      {daysRemaining}일 남음
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      onClick={() => handleUnblock(company.id)}
+                      className="btn-ghost text-xs px-2 py-1 text-success hover:bg-success/20"
+                    >
+                      차단 해제
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+
+        {blockedCompanies.length === 0 && (
+          <div className="text-center py-12 text-text-tertiary">
+            차단된 기업이 없습니다.
           </div>
         )}
       </div>
@@ -262,9 +476,11 @@ const AdminPage = () => {
               </p>
             </div>
 
-            <button className="btn btn-primary">
-              ➕ 새로 만들기
-            </button>
+            {(activeTab === 'companies' || activeTab === 'reservations') && (
+              <button onClick={handleCreate} className="btn btn-primary">
+                + {activeTab === 'companies' ? '기업 추가' : '예약 추가'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -327,12 +543,53 @@ const AdminPage = () => {
           ) : (
             <>
               {activeTab === 'companies' && <CompaniesTable />}
+              {activeTab === 'blocked' && <BlockedCompaniesTable />}
               {activeTab === 'reservations' && <ReservationsTable />}
               {activeTab === 'equipment' && <EquipmentTable />}
             </>
           )}
         </div>
       </div>
+
+      {/* Reservation Modal */}
+      <Modal
+        isOpen={showReservationModal}
+        onClose={() => {
+          setShowReservationModal(false)
+          setEditingReservation(null)
+        }}
+        title={editingReservation ? '예약 수정' : '새 예약 추가'}
+        size="lg"
+      >
+        <ReservationForm
+          reservation={editingReservation}
+          onSave={handleReservationSaved}
+          onCancel={() => {
+            setShowReservationModal(false)
+            setEditingReservation(null)
+          }}
+        />
+      </Modal>
+
+      {/* Company Modal */}
+      <Modal
+        isOpen={showCompanyModal}
+        onClose={() => {
+          setShowCompanyModal(false)
+          setEditingCompany(null)
+        }}
+        title={editingCompany ? '기업 정보 수정' : '새 기업 추가'}
+        size="lg"
+      >
+        <CompanyForm
+          company={editingCompany}
+          onSave={handleCompanySaved}
+          onCancel={() => {
+            setShowCompanyModal(false)
+            setEditingCompany(null)
+          }}
+        />
+      </Modal>
     </div>
   )
 }

@@ -1,13 +1,13 @@
 # SMBIZ Dashboard - 프로젝트 현황
 
-> 최종 업데이트: 2025-12-31 (2차 업데이트)
+> 최종 업데이트: 2026-01-02 (3차 업데이트)
 
 ## 📊 프로젝트 개요
 
 디지털 콘텐츠 제작실 예약 관리 시스템
 - **기술 스택**: React + Vite + Supabase + Tailwind CSS
 - **디자인**: macOS 스타일 glassmorphism
-- **상태**: 개발 중 (메인 페이지 완료, 통계/관리 페이지 미구현)
+- **상태**: 개발 중 (메인/통계/관리 페이지 완료)
 
 ---
 
@@ -43,20 +43,41 @@
 - [x] 개선된 텍스트 대비 및 계층 구조
 - [x] 장비별 컬러 시스템 (AS360, MICRO, XL, XXL, 알파데스크, 알파테이블, Compact)
 
-### 6. 컴포넌트 구조
+### 6. 통계 페이지 구현 (2026-01-02)
+- [x] 월/연도 필터 선택
+- [x] 장비별 예약 현황 (막대 차트)
+- [x] 자치구별 이용 현황 (파이 차트)
+- [x] 업종별 이용 시간 (가로 막대)
+- [x] 일별 예약 추이 (라인 차트)
+- [x] 상세 테이블 뷰 (장비별/자치구별)
+- [x] 클라이언트 사이드 데이터 집계
+
+### 7. 관리 페이지 구현 (2026-01-02)
+- [x] 탭 기반 네비게이션 (기업/차단기업/예약/장비)
+- [x] 기업 CRUD (추가/수정/삭제)
+- [x] 예약 CRUD (추가/수정/취소/노쇼 처리)
+- [x] 노쇼 예약 금지 시스템 (1주일 차단)
+- [x] 차단 기업 관리 및 해제 기능
+- [x] 검색 및 필터 기능
+- [x] 모달 기반 폼 UI
+
+### 8. 컴포넌트 구조
 ```
 src/
 ├── components/
 │   ├── Calendar.jsx          ✅ 달력 컴포넌트
 │   ├── Layout.jsx            ✅ 레이아웃 (사이드바)
 │   ├── Portal.jsx            ✅ Portal 래퍼
-│   └── TimelineView.jsx      ✅ 타임라인 뷰
+│   ├── TimelineView.jsx      ✅ 타임라인 뷰
+│   ├── Modal.jsx             ✅ 공통 모달 컴포넌트
+│   ├── ReservationForm.jsx   ✅ 예약 추가/수정 폼
+│   └── CompanyForm.jsx       ✅ 기업 추가/수정 폼
 ├── pages/
 │   ├── MainPage.jsx          ✅ 메인 페이지
-│   ├── StatsPage.jsx         ❌ 미구현
-│   └── AdminPage.jsx         ❌ 미구현
+│   ├── StatsPage.jsx         ✅ 통계 페이지
+│   └── AdminPage.jsx         ✅ 관리 페이지
 └── lib/
-    └── supabase.js           ✅ Supabase 클라이언트
+    └── supabase.js           ✅ Supabase 클라이언트 & API
 ```
 
 ---
@@ -139,39 +160,54 @@ if (hasTimeSlot && reservations.length > 0 && equipment === 'AS360') {
 
 ## 📋 해야 할 작업
 
-### 🔴 우선순위: 긴급 (다음 세션에서 즉시 해결)
+### ✅ 완료된 긴급 작업
 
-1. **엑셀 옵션 파싱 수정 & DB 재업로드** ⭐ 최우선
-   - [ ] `parseEquipmentOptions()` 함수 수정 (`/` 구분자 지원)
-   - [ ] 해결 방안 결정 (A: DB 클리어 후 재업로드 vs B: 매핑만 추가)
-   - [ ] DB 데이터 초기화 (선택시)
-   - [ ] 데이터 재업로드
-   - [ ] 타임라인 정상 표시 확인
+1. **엑셀 옵션 파싱 수정 & DB 재업로드** ✅ 완료 (2026-01-02)
+   - [x] `parseEquipmentOptions()` 함수 수정 (`/`, `\r\n` 구분자 지원)
+   - [x] 예약-장비 매핑 인덱스 불일치 문제 해결
+   - [x] 중복 매핑 제거 로직 추가
+   - [x] DB 클리어 후 재업로드 완료
+   - [x] 타임라인 정상 표시 확인 (66개 → 1110개 매핑)
 
-2. **디버그 로그 제거**
-   - [ ] TimelineView.jsx의 console.log 제거
+2. **상단바 통합 레이아웃** ✅ 완료 (2026-01-02)
+   - [x] 전체 상단바로 통합 (SMBIZ 디지털콘텐츠제작실)
+   - [x] 사이드바 높이 문제 해결
+   - [x] 시계 폰트 mono 적용 (`font-mono-num` 클래스)
 
 ---
 
-### 🟠 우선순위: 중간 (핵심 기능)
+### ✅ 완료된 긴급 작업 (추가)
 
-3. **통계 페이지 구현** (`/stats`)
-   - [ ] 날짜별 예약 통계
-   - [ ] 장비별 사용률
-   - [ ] 월별/주별 트렌드
-   - [ ] Chart.js 또는 Recharts 연동
+3. **디버그 로그 및 불필요한 UI 제거** ✅ 완료 (2026-01-02)
+   - [x] TimelineView.jsx의 console.log 제거
+   - [x] "예약이 없습니다" empty state 텍스트 제거
 
-4. **관리 페이지 구현** (`/admin`)
-   - [ ] 예약 추가 폼
-   - [ ] 예약 수정 기능
-   - [ ] 예약 삭제 기능
-   - [ ] 회사 정보 관리
+---
 
-5. **예약 CRUD 기능**
-   - [ ] 예약 생성 API 연동
-   - [ ] 예약 수정 API 연동
-   - [ ] 예약 삭제 API 연동
-   - [ ] 예약 상태 변경 (confirmed, pending, completed, cancelled)
+### ✅ 완료된 중간 우선순위 작업 (2026-01-02)
+
+2. **노쇼 예약 금지 기능** ✅ 완료
+   - [x] `companies` 테이블에 `blocked_until` 필드 사용
+   - [x] 노쇼 발생 시 1주일 예약 금지 처리
+   - [x] 예약 시 차단 상태 체크
+   - [x] 관리 페이지에서 차단 해제 기능
+
+3. **통계 페이지 구현** (`/stats`) ✅ 완료
+   - [x] 월/연도별 예약 통계
+   - [x] 장비별 사용률
+   - [x] 월별/일별 트렌드
+   - [x] Recharts 연동
+
+4. **관리 페이지 구현** (`/admin`) ✅ 완료
+   - [x] 예약 추가/수정/삭제 모달
+   - [x] 기업 추가/수정/삭제 모달
+   - [x] 차단 기업 관리
+
+5. **예약 CRUD 기능** ✅ 완료
+   - [x] 예약 생성 API 연동
+   - [x] 예약 수정 API 연동
+   - [x] 예약 취소/삭제 API 연동
+   - [x] 예약 상태 변경 (confirmed, pending, completed, cancelled, no_show)
 
 ---
 
@@ -211,8 +247,8 @@ if (hasTimeSlot && reservations.length > 0 && equipment === 'AS360') {
 ## 🔧 기술 부채
 
 ### 즉시 해결 필요
-- equipment_types null 처리
-- 디버그 로그 제거
+- ✅ equipment_types null 처리 (완료)
+- ✅ 디버그 로그 제거 (완료)
 
 ### 중기 계획
 - TypeScript 마이그레이션 검토
@@ -237,11 +273,14 @@ smbiz-dashboard/
 │   │   ├── Calendar.jsx          # 달력 컴포넌트
 │   │   ├── Layout.jsx            # 레이아웃 (사이드바 + 메인)
 │   │   ├── Portal.jsx            # React Portal 래퍼
-│   │   └── TimelineView.jsx      # 예약 타임라인 뷰
+│   │   ├── TimelineView.jsx      # 예약 타임라인 뷰
+│   │   ├── Modal.jsx             # 공통 모달 컴포넌트
+│   │   ├── ReservationForm.jsx   # 예약 추가/수정 폼
+│   │   └── CompanyForm.jsx       # 기업 추가/수정 폼
 │   ├── pages/
 │   │   ├── MainPage.jsx          # 메인 페이지 (예약 현황)
-│   │   ├── StatsPage.jsx         # 통계 페이지 (미구현)
-│   │   └── AdminPage.jsx         # 관리 페이지 (미구현)
+│   │   ├── StatsPage.jsx         # 통계 페이지
+│   │   └── AdminPage.jsx         # 관리 페이지
 │   ├── lib/
 │   │   └── supabase.js           # Supabase 클라이언트 & API
 │   ├── styles/
@@ -312,22 +351,20 @@ Compact: #6366F1 (Indigo)
 
 ## 🚀 다음 단계
 
-### 1단계: 버그 수정
-1. equipment_types null 처리 방안 결정
-2. 디버그 로그 제거
-3. Git 커밋 & 푸시
+### 1단계: 추가 기능 개선 (우선순위 낮음)
+1. 회사명 검색 자동완성
+2. 예약 필터 (날짜 범위, 상태별)
+3. 장비별 가용 현황 표시
 
-### 2단계: 통계 페이지
-1. 기본 레이아웃 구성
-2. 날짜별 예약 수 차트
-3. 장비별 사용률 차트
-4. 상태별 통계
+### 2단계: UX 개선
+1. 토스트 알림 시스템 구현
+2. 로딩 스피너 개선
+3. 폼 유효성 검사 강화
 
-### 3단계: 관리 페이지
-1. 예약 추가 폼 UI
-2. 예약 수정 모달
-3. 예약 삭제 확인 다이얼로그
-4. Supabase API 연동
+### 3단계: 데이터 내보내기
+1. Excel 내보내기 기능
+2. PDF 보고서 생성
+3. 인쇄 최적화
 
 ---
 

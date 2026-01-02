@@ -45,24 +45,9 @@ const TimelineView = ({ date, reservations, equipmentTypes, loading, onRefresh }
 
   // Get reservations for specific equipment and time slot
   const getReservationForSlot = (equipment, slotId) => {
-    const filtered = reservations.filter(r => {
-      const hasTimeSlot = r.time_slot === slotId
-      const hasEquipment = r.equipment_types?.includes(equipment)
-
-      // Debug logging - show actual array contents
-      if (hasTimeSlot && reservations.length > 0 && equipment === 'AS360') {
-        console.log('Debug equipment_types:', {
-          company: r.company_name,
-          looking_for: equipment,
-          actual_array: r.equipment_types,
-          array_contents: JSON.stringify(r.equipment_types),
-          hasEquipment
-        })
-      }
-
-      return hasTimeSlot && hasEquipment
-    })
-    return filtered
+    return reservations.filter(r =>
+      r.time_slot === slotId && r.equipment_types?.includes(equipment)
+    )
   }
 
   // Status badge component
@@ -72,12 +57,13 @@ const TimelineView = ({ date, reservations, equipmentTypes, loading, onRefresh }
       pending: { label: '대기', class: 'badge-warning' },
       completed: { label: '완료', class: 'badge-primary' },
       cancelled: { label: '취소', class: 'badge-danger' },
+      no_show: { label: '노쇼', class: 'bg-red-900/50 text-red-300 border border-red-500/30' },
     }
 
     const config = statusConfig[status] || statusConfig.confirmed
 
     return (
-      <span className={`badge ${config.class}`}>
+      <span className={`badge ${config.class} text-[9px] px-1.5 py-0.5`}>
         {config.label}
       </span>
     )
@@ -218,39 +204,24 @@ const TimelineView = ({ date, reservations, equipmentTypes, loading, onRefresh }
         className={`relative ${isActive ? 'z-[10000]' : 'z-0'}`}
         onClick={handleClick}
       >
-        <div className="bg-bg-elevated/40 backdrop-blur-xl border border-border rounded-xl p-4 hover:bg-bg-elevated/60 hover:border-border-hover hover:shadow-md transition-all duration-200 cursor-pointer">
-          <div className="flex items-start justify-between mb-2.5">
+        <div className="bg-bg-elevated/40 backdrop-blur-xl border border-border rounded-lg p-2.5 hover:bg-bg-elevated/60 hover:border-border-hover hover:shadow-md transition-all duration-200 cursor-pointer">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-semibold text-text-primary mb-1 truncate">
+              <h4 className="text-xs font-semibold text-text-primary truncate">
                 {reservation.company_name}
               </h4>
-              <p className="text-xs text-text-tertiary truncate">
+              <p className="text-[10px] text-text-tertiary truncate">
                 {reservation.representative || '대표자 미등록'}
               </p>
             </div>
             <StatusBadge status={reservation.status} />
           </div>
 
-          {/* Info Bar */}
-          <div className="flex items-center gap-2.5 text-xs">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-bg-tertiary/40 rounded-md">
-              <span className="text-text-tertiary">👥</span>
-              <span className="text-text-primary font-medium">{reservation.attendees}명</span>
-            </div>
-            {(reservation.is_training || reservation.is_seminar) && (
-              <div className="flex gap-1.5">
-                {reservation.is_training && (
-                  <div className="px-2 py-1 bg-primary/10 text-primary rounded-md flex items-center gap-1">
-                    <span>📚</span>
-                  </div>
-                )}
-                {reservation.is_seminar && (
-                  <div className="px-2 py-1 bg-warning/10 text-warning rounded-md flex items-center gap-1">
-                    <span>🎤</span>
-                  </div>
-                )}
-              </div>
-            )}
+          {/* Info Bar - Compact */}
+          <div className="flex items-center gap-1.5 mt-1.5 text-[10px]">
+            <span className="text-text-tertiary">{reservation.attendees}명</span>
+            {reservation.is_training && <span className="text-primary">교육</span>}
+            {reservation.is_seminar && <span className="text-warning">세미나</span>}
           </div>
         </div>
 
@@ -260,11 +231,10 @@ const TimelineView = ({ date, reservations, equipmentTypes, loading, onRefresh }
     )
   }
 
-  // Empty state - macOS style
+  // Empty state - macOS style - Compact
   const EmptySlot = () => (
-    <div className="bg-bg-tertiary/10 border border-dashed border-border rounded-xl p-6 text-center">
-      <div className="text-2xl mb-2 opacity-20">📭</div>
-      <p className="text-xs text-text-tertiary font-medium">예약 없음</p>
+    <div className="flex-1 bg-bg-tertiary/10 border border-dashed border-border rounded-lg flex items-center justify-center">
+      <p className="text-[10px] text-text-muted">-</p>
     </div>
   )
 
@@ -288,21 +258,21 @@ const TimelineView = ({ date, reservations, equipmentTypes, loading, onRefresh }
   }
 
   return (
-    <div className="p-8 overflow-visible">
-      {/* Action Bar */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="h-full flex flex-col p-6 overflow-visible">
+      {/* Action Bar - Compact */}
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div>
-          <h2 className="text-xl font-semibold text-text-primary">
+          <h2 className="text-lg font-semibold text-text-primary">
             예약 타임라인
           </h2>
-          <p className="text-sm text-text-tertiary mt-1">
+          <p className="text-xs text-text-tertiary mt-0.5">
             {format(date, 'yyyy년 M월 d일', { locale: ko })} 장비별 예약 현황
           </p>
         </div>
 
         <button
           onClick={onRefresh}
-          className="px-3.5 py-2 text-sm font-medium bg-bg-secondary/60 hover:bg-bg-secondary border border-border/60 rounded-lg transition-all flex items-center gap-2"
+          className="px-3 py-1.5 text-sm font-medium bg-bg-secondary/60 hover:bg-bg-secondary border border-border/60 rounded-lg transition-all flex items-center gap-2"
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path d="M2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -311,54 +281,52 @@ const TimelineView = ({ date, reservations, equipmentTypes, loading, onRefresh }
         </button>
       </div>
 
-      {/* Timeline Grid - Row per Time Slot */}
-      <div className="space-y-5">
+      {/* Timeline Grid - Row per Time Slot - Flex to fill height */}
+      <div className="flex-1 flex flex-col gap-4 min-h-0">
         {timeSlots.map((slot) => (
-          <div key={slot.id} className="bg-bg-secondary/30 backdrop-blur-2xl rounded-2xl p-6 border border-border min-h-[340px] shadow-glass" style={{ overflow: 'visible' }}>
-            {/* Time Slot Header */}
-            <div className="mb-5 pb-4 border-b border-border/40">
+          <div key={slot.id} className="flex-1 bg-bg-secondary/30 backdrop-blur-2xl rounded-xl p-4 border border-border shadow-glass flex flex-col min-h-[180px]" style={{ overflow: 'visible' }}>
+            {/* Time Slot Header - Compact */}
+            <div className="mb-3 pb-2 border-b border-border/40 flex-shrink-0">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-1 h-10 rounded-full ${slot.id === 'morning' ? 'bg-success' : 'bg-warning'}`}></div>
-                  <div>
-                    <h3 className="text-base font-semibold text-text-primary">
-                      {slot.label}
-                    </h3>
-                    <p className="text-xs text-text-tertiary mt-0.5">
-                      {slot.time}
-                    </p>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-1 h-6 rounded-full ${slot.id === 'morning' ? 'bg-success' : 'bg-warning'}`}></div>
+                  <h3 className="text-sm font-semibold text-text-primary">
+                    {slot.label}
+                  </h3>
+                  <span className="text-xs text-text-tertiary">
+                    {slot.time}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-bg-tertiary/50 backdrop-blur-sm rounded-lg border border-border/30">
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-bg-tertiary/50 backdrop-blur-sm rounded-md border border-border/30">
                   <span className="text-xs text-text-tertiary">예약</span>
-                  <span className="text-sm font-bold text-text-primary">
+                  <span className="text-xs font-bold text-text-primary">
                     {reservations.filter(r => r.time_slot === slot.id).length}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Equipment Columns Grid */}
-            <div className="grid gap-3.5" style={{ gridTemplateColumns: `repeat(${equipmentTypes.length}, minmax(0, 1fr))`, overflow: 'visible', isolation: 'auto' }}>
+            {/* Equipment Columns Grid - Flex to fill remaining space */}
+            <div className="flex-1 grid gap-3" style={{ gridTemplateColumns: `repeat(${equipmentTypes.length}, minmax(0, 1fr))`, overflow: 'visible', isolation: 'auto' }}>
               {equipmentTypes.map((equipment) => {
                 const slotReservations = getReservationForSlot(equipment, slot.id)
 
                 return (
-                  <div key={equipment} className="min-w-0" style={{ overflow: 'visible' }}>
-                    {/* Equipment Header */}
-                    <div className="flex items-center gap-2 mb-3 px-0.5">
+                  <div key={equipment} className="min-w-0 flex flex-col" style={{ overflow: 'visible' }}>
+                    {/* Equipment Header - Compact */}
+                    <div className="flex items-center gap-1.5 mb-2 px-0.5 flex-shrink-0">
                       <div
-                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                         style={{ backgroundColor: `var(--${getEquipmentColor(equipment)})` }}
                       />
-                      <span className="text-xs font-bold text-text-primary uppercase tracking-wide truncate">
+                      <span className="text-[10px] font-bold text-text-primary uppercase tracking-wide truncate">
                         {equipment}
                       </span>
                     </div>
 
                     {/* Reservations or Empty State */}
                     {slotReservations.length > 0 ? (
-                      <div className="space-y-2.5" style={{ overflow: 'visible' }}>
+                      <div className="flex-1 space-y-2 overflow-y-auto" style={{ overflow: 'visible' }}>
                         {slotReservations.map((reservation) => (
                           <ReservationCard
                             key={`${reservation.id}-${equipment}-${slot.id}`}
@@ -379,18 +347,6 @@ const TimelineView = ({ date, reservations, equipmentTypes, loading, onRefresh }
         ))}
       </div>
 
-      {/* Overall Empty State */}
-      {reservations.length === 0 && !loading && (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4">📅</div>
-          <h3 className="text-xl font-semibold text-text-primary mb-2">
-            예약이 없습니다
-          </h3>
-          <p className="text-text-tertiary">
-            선택한 날짜에 등록된 예약이 없습니다.
-          </p>
-        </div>
-      )}
     </div>
   )
 }

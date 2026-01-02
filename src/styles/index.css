@@ -17,6 +17,13 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Monospace font for numbers (clock, stats, etc.) */
+  .font-mono-num {
+    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
   /* Custom Scrollbar */
   ::-webkit-scrollbar {
     width: 8px;

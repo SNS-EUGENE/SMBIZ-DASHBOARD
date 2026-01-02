@@ -28,7 +28,11 @@
       "Bash(node scripts/deep-analyze-excel.js:*)",
       "Bash(npm install:*)",
       "Bash(node scripts/check-duplicate-companies.js:*)",
-      "Bash(npm run clean-db:*)"
+      "Bash(npm run clean-db:*)",
+      "Bash(npx supabase:*)",
+      "Bash(node scripts/analyze-reservation-data.js:*)",
+      "Bash(node scripts/check-excel-options.js:*)",
+      "Bash(node:*)"
     ]
   }
 }

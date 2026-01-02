@@ -1,14 +1,32 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
 import { api } from '../lib/supabase'
 import { useToast } from './Toast'
+import Modal from './Modal'
 
 const EQUIPMENT_TYPES = ['AS360', 'MICRO', 'XL', 'XXL', '알파데스크', '알파테이블', 'Compact']
+
+// 붙여넣기 데이터 파싱 함수
+const parsePastedData = (text) => {
+  try {
+    const data = JSON.parse(text)
+    // SMBIZ 데이터 형식 확인
+    if (data._type === 'SMBIZ_RESERVATION_DATA') {
+      return data
+    }
+    return null
+  } catch {
+    return null
+  }
+}
 
 const ReservationForm = ({ reservation, defaultDate, onSave, onCancel }) => {
   const toast = useToast()
   const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(false)
+  const [pastedCompanyData, setPastedCompanyData] = useState(null)
+  const [showNewCompanyModal, setShowNewCompanyModal] = useState(false)
+  const [creatingCompany, setCreatingCompany] = useState(false)
   const [formData, setFormData] = useState({
     company_id: '',
     reservation_date: '',
@@ -25,7 +43,14 @@ const ReservationForm = ({ reservation, defaultDate, onSave, onCancel }) => {
   })
 
   useEffect(() => {
-    fetchCompanies()
+    const init = async () => {
+      await fetchCompanies()
+    }
+    init()
+  }, [])
+
+  // reservation이 변경될 때 formData 설정 (companies 로딩과 별개로)
+  useEffect(() => {
     if (reservation) {
       setFormData({
         company_id: reservation.company_id || '',
@@ -69,6 +94,100 @@ const ReservationForm = ({ reservation, defaultDate, onSave, onCancel }) => {
         ? prev.equipment_types.filter(e => e !== equipment)
         : [...prev.equipment_types, equipment]
     }))
+  }
+
+  // 클립보드에서 데이터 읽기 (버튼 클릭)
+  const handlePasteFromClipboard = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (!text) {
+        toast.warning('클립보드가 비어있습니다.')
+        return
+      }
+
+      const parsed = parsePastedData(text)
+      if (!parsed) {
+        toast.warning('SMBIZ 데이터 형식이 아닙니다. 크롬 익스텐션에서 복사해주세요.')
+        return
+      }
+
+      toast.info('SMBIZ 데이터를 불러왔습니다.')
+
+      // 예약 데이터 적용
+      const { reservation: resData, company: compData, notes } = parsed
+
+      setFormData(prev => ({
+        ...prev,
+        reservation_date: resData.date || prev.reservation_date,
+        time_slot: resData.timeSlot || prev.time_slot,
+        equipment_types: resData.equipment || prev.equipment_types,
+        work_2d: resData.work2d || 0,
+        work_3d: resData.work3d || 0,
+        work_video: resData.workVideo || 0,
+        notes: notes || prev.notes,
+      }))
+
+      // 기업 매칭 시도
+      if (compData?.name) {
+        // 1. 기업명으로 검색
+        let matchedCompany = companies.find(c =>
+          c.name === compData.name ||
+          c.name.includes(compData.name) ||
+          compData.name.includes(c.name)
+        )
+
+        // 2. 사업자등록번호로 검색
+        if (!matchedCompany && compData.businessNumber) {
+          matchedCompany = companies.find(c =>
+            c.business_number === compData.businessNumber
+          )
+        }
+
+        if (matchedCompany) {
+          setFormData(prev => ({ ...prev, company_id: matchedCompany.id }))
+          toast.success(`기업 "${matchedCompany.name}" 자동 선택됨`)
+        } else {
+          // 기업이 없으면 새로 등록할지 물어봄
+          setPastedCompanyData(compData)
+          setShowNewCompanyModal(true)
+        }
+      }
+    } catch (error) {
+      toast.error('클립보드 읽기 실패: ' + error.message)
+    }
+  }, [companies, toast])
+
+  // 새 기업 등록
+  const handleCreateNewCompany = async () => {
+    if (!pastedCompanyData) return
+
+    setCreatingCompany(true)
+    try {
+      const newCompany = {
+        name: pastedCompanyData.name,
+        representative: pastedCompanyData.representative || '',
+        business_number: pastedCompanyData.businessNumber || '',
+        industry: pastedCompanyData.industry || '기타',
+        contact: pastedCompanyData.contact || '',
+        district: '',
+      }
+
+      const { data, error } = await api.companies.create(newCompany)
+      if (error) throw error
+
+      // 기업 목록 새로고침
+      await fetchCompanies()
+
+      // 새로 생성된 기업 선택
+      setFormData(prev => ({ ...prev, company_id: data.id }))
+      toast.success(`기업 "${newCompany.name}" 등록 완료`)
+      setShowNewCompanyModal(false)
+      setPastedCompanyData(null)
+    } catch (error) {
+      toast.error('기업 등록 실패: ' + error.message)
+    } finally {
+      setCreatingCompany(false)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -143,7 +262,8 @@ const ReservationForm = ({ reservation, defaultDate, onSave, onCancel }) => {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="p-6 space-y-5">
+    <>
+    <form id="reservation-form" onSubmit={handleSubmit} className="p-6 space-y-5">
       {/* 기업 선택 */}
       <div>
         <label className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -249,7 +369,13 @@ const ReservationForm = ({ reservation, defaultDate, onSave, onCancel }) => {
             <option value="confirmed">확정</option>
             <option value="completed">완료</option>
             <option value="cancelled">취소</option>
+            <option value="no_show">노쇼</option>
           </select>
+          {formData.status === 'no_show' && (
+            <p className="text-xs text-warning mt-1">
+              노쇼 처리 시 해당 기업은 1주일간 예약이 제한됩니다.
+            </p>
+          )}
         </div>
       </div>
 
@@ -335,24 +461,119 @@ const ReservationForm = ({ reservation, defaultDate, onSave, onCancel }) => {
       </div>
 
       {/* 버튼 */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="btn btn-ghost"
-          disabled={loading}
-        >
-          취소
-        </button>
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={loading}
-        >
-          {loading ? '저장 중...' : (reservation?.id ? '수정' : '추가')}
-        </button>
+      <div className="flex items-center justify-between pt-4 border-t border-border">
+        {/* 좌측: SMBIZ 붙여넣기 버튼 */}
+        <div>
+          {!reservation && (
+            <button
+              type="button"
+              onClick={handlePasteFromClipboard}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+              disabled={loading}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              SMBIZ 붙여넣기
+            </button>
+          )}
+        </div>
+
+        {/* 우측: 취소/저장 버튼 */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="btn btn-ghost"
+            disabled={loading}
+          >
+            취소
+          </button>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading}
+          >
+            {loading ? '저장 중...' : (reservation?.id ? '수정' : '추가')}
+          </button>
+        </div>
       </div>
     </form>
+
+    {/* 새 기업 등록 모달 */}
+    <Modal
+      isOpen={showNewCompanyModal}
+      onClose={() => {
+        setShowNewCompanyModal(false)
+        setPastedCompanyData(null)
+      }}
+      title="새 기업 등록"
+      size="md"
+    >
+      <div className="p-6">
+        <p className="text-sm text-text-secondary mb-4">
+          기업 "{pastedCompanyData?.name}"이(가) 등록되어 있지 않습니다.
+          새로 등록하시겠습니까?
+        </p>
+
+        {pastedCompanyData && (
+          <div className="bg-bg-tertiary rounded-lg p-4 mb-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-text-tertiary">기업명</span>
+              <span className="text-text-primary font-medium">{pastedCompanyData.name}</span>
+            </div>
+            {pastedCompanyData.representative && (
+              <div className="flex justify-between">
+                <span className="text-text-tertiary">대표자</span>
+                <span className="text-text-primary">{pastedCompanyData.representative}</span>
+              </div>
+            )}
+            {pastedCompanyData.businessNumber && (
+              <div className="flex justify-between">
+                <span className="text-text-tertiary">사업자번호</span>
+                <span className="text-text-primary font-mono">{pastedCompanyData.businessNumber}</span>
+              </div>
+            )}
+            {pastedCompanyData.industry && (
+              <div className="flex justify-between">
+                <span className="text-text-tertiary">업종</span>
+                <span className="text-text-primary">{pastedCompanyData.industry}</span>
+              </div>
+            )}
+            {pastedCompanyData.contact && (
+              <div className="flex justify-between">
+                <span className="text-text-tertiary">연락처</span>
+                <span className="text-text-primary">{pastedCompanyData.contact}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setShowNewCompanyModal(false)
+              setPastedCompanyData(null)
+            }}
+            className="btn btn-ghost"
+            disabled={creatingCompany}
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={handleCreateNewCompany}
+            className="btn btn-primary"
+            disabled={creatingCompany}
+          >
+            {creatingCompany ? '등록 중...' : '기업 등록'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+    </>
   )
 }
 

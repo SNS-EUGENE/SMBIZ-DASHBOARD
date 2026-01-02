@@ -259,28 +259,6 @@ const TimelineView = ({ date, reservations, equipmentTypes, loading, onRefresh }
 
   return (
     <div className="h-full flex flex-col p-6 overflow-visible">
-      {/* Action Bar - Compact */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">
-            예약 타임라인
-          </h2>
-          <p className="text-xs text-text-tertiary mt-0.5">
-            {format(date, 'yyyy년 M월 d일', { locale: ko })} 장비별 예약 현황
-          </p>
-        </div>
-
-        <button
-          onClick={onRefresh}
-          className="px-3 py-1.5 text-sm font-medium bg-bg-secondary/60 hover:bg-bg-secondary border border-border/60 rounded-lg transition-all flex items-center gap-2"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          <span className="text-text-primary">새로고침</span>
-        </button>
-      </div>
-
       {/* Timeline Grid - Row per Time Slot - Flex to fill height */}
       <div className="flex-1 flex flex-col gap-4 min-h-0">
         {timeSlots.map((slot) => (

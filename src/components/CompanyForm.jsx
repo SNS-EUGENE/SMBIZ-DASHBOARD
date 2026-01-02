@@ -10,7 +10,9 @@ const DISTRICTS = [
 
 const INDUSTRIES = [
   '제조업', '도소매업', 'IT/소프트웨어', '서비스업', '건설업', '교육업',
-  '음식/숙박업', '금융/보험업', '부동산업', '예술/스포츠/여가', '기타'
+  '음식/숙박업', '금융/보험업', '부동산업', '예술/스포츠/여가',
+  '전자상거래', '콘텐츠제작', '디자인', '광고/마케팅', '컨설팅',
+  '기타업종', '기타'
 ]
 
 const CompanyForm = ({ company, onSave, onCancel }) => {
@@ -172,6 +174,10 @@ const CompanyForm = ({ company, onSave, onCancel }) => {
             className="input w-full"
           >
             <option value="">업종 선택</option>
+            {/* 기존값이 목록에 없으면 별도로 표시 */}
+            {formData.industry && !INDUSTRIES.includes(formData.industry) && (
+              <option value={formData.industry}>{formData.industry}</option>
+            )}
             {INDUSTRIES.map(ind => (
               <option key={ind} value={ind}>{ind}</option>
             ))}

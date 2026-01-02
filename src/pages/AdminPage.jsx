@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { api } from '../lib/supabase'
+import { api, supabase } from '../lib/supabase'
 import { exportCompanies, exportReservations, exportEquipment } from '../lib/exportUtils'
 import Modal from '../components/Modal'
 import ReservationForm from '../components/ReservationForm'
@@ -21,8 +21,19 @@ const AdminPage = () => {
   // Modal states
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showCompanyModal, setShowCompanyModal] = useState(false)
+  const [showEquipmentModal, setShowEquipmentModal] = useState(false)
   const [editingReservation, setEditingReservation] = useState(null)
   const [editingCompany, setEditingCompany] = useState(null)
+  const [editingEquipment, setEditingEquipment] = useState(null)
+
+  // Confirm modal states
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    title: '',
+    message: '',
+    type: 'warning', // 'warning' | 'danger' | 'info'
+    onConfirm: null,
+  })
 
   useEffect(() => {
     fetchData()
@@ -48,32 +59,47 @@ const AdminPage = () => {
     setLoading(false)
   }
 
-  const handleNoShow = async (reservationId, companyId) => {
-    if (!confirm('이 예약을 노쇼 처리하시겠습니까?\n해당 기업은 1주일간 예약이 제한됩니다.')) {
+  const handleNoShow = (reservationId, companyId) => {
+    if (!companyId) {
+      toast.error('노쇼 처리 실패: 기업 정보를 찾을 수 없습니다.')
       return
     }
 
-    const { error } = await api.reservations.markNoShow(reservationId, companyId)
-    if (error) {
-      toast.error('노쇼 처리 실패: ' + error.message)
-    } else {
-      toast.warning('노쇼 처리 완료. 해당 기업은 1주일간 예약이 제한됩니다.')
-      fetchData()
-    }
+    setConfirmModal({
+      show: true,
+      title: '노쇼 처리',
+      message: '이 예약을 노쇼 처리하시겠습니까?\n해당 기업은 1주일간 예약이 제한됩니다.',
+      type: 'danger',
+      onConfirm: async () => {
+        const { error } = await api.reservations.markNoShow(reservationId, companyId)
+        if (error) {
+          toast.error('노쇼 처리 실패: ' + error.message)
+        } else {
+          toast.warning('노쇼 처리 완료. 해당 기업은 1주일간 예약이 제한됩니다.')
+          fetchData()
+        }
+        setConfirmModal(prev => ({ ...prev, show: false }))
+      },
+    })
   }
 
-  const handleUnblock = async (companyId) => {
-    if (!confirm('이 기업의 예약 제한을 해제하시겠습니까?')) {
-      return
-    }
-
-    const { error } = await api.companies.unblock(companyId)
-    if (error) {
-      toast.error('차단 해제 실패: ' + error.message)
-    } else {
-      toast.success('예약 제한이 해제되었습니다.')
-      fetchData()
-    }
+  const handleUnblock = (companyId) => {
+    setConfirmModal({
+      show: true,
+      title: '차단 해제',
+      message: '이 기업의 예약 제한을 해제하시겠습니까?',
+      type: 'info',
+      onConfirm: async () => {
+        const { error } = await api.companies.unblock(companyId)
+        if (error) {
+          toast.error('차단 해제 실패: ' + error.message)
+        } else {
+          toast.success('예약 제한이 해제되었습니다.')
+          fetchData()
+        }
+        setConfirmModal(prev => ({ ...prev, show: false }))
+      },
+    })
   }
 
   // Reservation CRUD handlers
@@ -93,32 +119,42 @@ const AdminPage = () => {
     fetchData()
   }
 
-  const handleCancelReservation = async (id) => {
-    if (!confirm('이 예약을 취소하시겠습니까?')) {
-      return
-    }
-
-    const { error } = await api.reservations.cancel(id)
-    if (error) {
-      toast.error('예약 취소 실패: ' + error.message)
-    } else {
-      toast.success('예약이 취소되었습니다.')
-      fetchData()
-    }
+  const handleCancelReservation = (id) => {
+    setConfirmModal({
+      show: true,
+      title: '예약 취소',
+      message: '이 예약을 취소하시겠습니까?',
+      type: 'warning',
+      onConfirm: async () => {
+        const { error } = await api.reservations.cancel(id)
+        if (error) {
+          toast.error('예약 취소 실패: ' + error.message)
+        } else {
+          toast.success('예약이 취소되었습니다.')
+          fetchData()
+        }
+        setConfirmModal(prev => ({ ...prev, show: false }))
+      },
+    })
   }
 
-  const handleDeleteReservation = async (id) => {
-    if (!confirm('이 예약을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-      return
-    }
-
-    const { error } = await api.reservations.delete(id)
-    if (error) {
-      toast.error('예약 삭제 실패: ' + error.message)
-    } else {
-      toast.success('예약이 삭제되었습니다.')
-      fetchData()
-    }
+  const handleDeleteReservation = (id) => {
+    setConfirmModal({
+      show: true,
+      title: '예약 삭제',
+      message: '이 예약을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
+      type: 'danger',
+      onConfirm: async () => {
+        const { error } = await api.reservations.delete(id)
+        if (error) {
+          toast.error('예약 삭제 실패: ' + error.message)
+        } else {
+          toast.success('예약이 삭제되었습니다.')
+          fetchData()
+        }
+        setConfirmModal(prev => ({ ...prev, show: false }))
+      },
+    })
   }
 
   // Company CRUD handlers
@@ -138,16 +174,41 @@ const AdminPage = () => {
     fetchData()
   }
 
-  const handleDeleteCompany = async (id) => {
-    if (!confirm('이 기업을 삭제하시겠습니까? 관련된 모든 예약도 삭제됩니다.')) {
-      return
-    }
+  const handleDeleteCompany = (id) => {
+    setConfirmModal({
+      show: true,
+      title: '기업 삭제',
+      message: '이 기업을 삭제하시겠습니까?\n관련된 모든 예약도 함께 삭제됩니다.',
+      type: 'danger',
+      onConfirm: async () => {
+        const { error } = await api.companies.delete(id)
+        if (error) {
+          toast.error('기업 삭제 실패: ' + error.message)
+        } else {
+          toast.success('기업이 삭제되었습니다.')
+          fetchData()
+        }
+        setConfirmModal(prev => ({ ...prev, show: false }))
+      },
+    })
+  }
 
-    const { error } = await api.companies.delete(id)
+  // Equipment CRUD handlers
+  const handleEditEquipment = (item) => {
+    setEditingEquipment(item)
+    setShowEquipmentModal(true)
+  }
+
+  const handleEquipmentStatusChange = async (id, newStatus) => {
+    const { error } = await supabase
+      .from('equipment')
+      .update({ status: newStatus })
+      .eq('id', id)
+
     if (error) {
-      toast.error('기업 삭제 실패: ' + error.message)
+      toast.error('상태 변경 실패: ' + error.message)
     } else {
-      toast.success('기업이 삭제되었습니다.')
+      toast.success('장비 상태가 변경되었습니다.')
       fetchData()
     }
   }
@@ -175,11 +236,42 @@ const AdminPage = () => {
     }
   }
 
+  // SVG 아이콘
+  const BuildingIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
+      <path d="M9 22v-4h6v4"/>
+      <path d="M8 6h.01M16 6h.01M12 6h.01M8 10h.01M16 10h.01M12 10h.01M8 14h.01M16 14h.01M12 14h.01"/>
+    </svg>
+  )
+
+  const BlockIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+    </svg>
+  )
+
+  const CalendarIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+      <line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  )
+
+  const ToolIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+    </svg>
+  )
+
   const tabs = [
-    { id: 'companies', label: '기업 관리', icon: '🏢', count: companies.length },
-    { id: 'blocked', label: '차단 기업', icon: '🚫', count: blockedCompanies.length },
-    { id: 'reservations', label: '예약 관리', icon: '📅', count: reservations.length },
-    { id: 'equipment', label: '장비 관리', icon: '🔧', count: equipment.length },
+    { id: 'companies', label: '기업 관리', icon: BuildingIcon, count: companies.length },
+    { id: 'blocked', label: '차단 기업', icon: BlockIcon, count: blockedCompanies.length },
+    { id: 'reservations', label: '예약 관리', icon: CalendarIcon, count: reservations.length },
+    { id: 'equipment', label: '장비 관리', icon: ToolIcon, count: equipment.length },
   ]
 
   // Filter data based on search
@@ -465,8 +557,15 @@ const AdminPage = () => {
                 </td>
                 <td>
                   <div className="flex items-center gap-2">
-                    <button className="btn-ghost text-xs px-2 py-1">수정</button>
-                    <button className="btn-ghost text-xs px-2 py-1 text-danger">삭제</button>
+                    <select
+                      value={item.status}
+                      onChange={(e) => handleEquipmentStatusChange(item.id, e.target.value)}
+                      className="input text-xs py-1 px-2"
+                    >
+                      <option value="active">활성</option>
+                      <option value="maintenance">정비중</option>
+                      <option value="inactive">비활성</option>
+                    </select>
                   </div>
                 </td>
               </tr>
@@ -483,78 +582,107 @@ const AdminPage = () => {
     )
   }
 
+  // 내보내기 아이콘
+  const DownloadIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  )
+
+  // 새로고침 아이콘
+  const RefreshIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10"/>
+      <polyline points="1 20 1 14 7 14"/>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+    </svg>
+  )
+
   return (
-    <div className="min-h-screen bg-bg-primary">
-      {/* Header */}
-      <header className="border-b border-border bg-bg-secondary sticky top-0 z-10">
-        <div className="px-8 py-6">
+    <div className="h-full flex flex-col bg-bg-primary overflow-hidden">
+      {/* Header - 통계 페이지 스타일 통일 */}
+      <header className="border-b border-border bg-bg-secondary/60 backdrop-blur-xl flex-shrink-0 z-10">
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-text-primary">관리자 페이지</h1>
-              <p className="text-sm text-text-tertiary mt-1">
+              <h1 className="text-xl font-bold text-text-primary">관리자 페이지</h1>
+              <p className="text-xs text-text-tertiary mt-0.5">
                 데이터 관리 및 설정
               </p>
             </div>
 
-            {(activeTab === 'companies' || activeTab === 'reservations') && (
-              <button onClick={handleCreate} className="btn btn-primary">
-                + {activeTab === 'companies' ? '기업 추가' : '예약 추가'}
+            <div className="flex items-center gap-3">
+              {/* 검색 */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input text-sm py-1.5 pl-9 w-64"
+                />
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              </div>
+
+              {/* 버튼 그룹 */}
+              {activeTab !== 'blocked' && (
+                <button className="btn btn-ghost text-sm py-1.5 px-3 flex items-center gap-1.5" onClick={handleExport}>
+                  <DownloadIcon />
+                  <span>내보내기</span>
+                </button>
+              )}
+              <button className="btn btn-ghost text-sm py-1.5 px-3 flex items-center gap-1.5" onClick={fetchData}>
+                <RefreshIcon />
+                <span>새로고침</span>
               </button>
-            )}
+              {(activeTab === 'companies' || activeTab === 'reservations') && (
+                <button onClick={handleCreate} className="btn btn-primary text-sm py-1.5 px-3 flex items-center gap-1.5">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 2V12M2 7H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  <span>{activeTab === 'companies' ? '기업 추가' : '예약 추가'}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="px-8 flex items-center gap-2 border-t border-border">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id)
-                setSearchQuery('')
-              }}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all ${
-                activeTab === tab.id
-                  ? 'border-primary text-text-primary font-semibold'
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-              {tab.count > 0 && (
-                <span className="bg-bg-tertiary px-2 py-0.5 rounded-full text-xs">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
+        <div className="px-6 flex items-center gap-1 border-t border-border/50">
+          {tabs.map((tab) => {
+            const IconComponent = tab.icon
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id)
+                  setSearchQuery('')
+                }}
+                className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all ${
+                  activeTab === tab.id
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <IconComponent />
+                <span className="text-sm">{tab.label}</span>
+                {tab.count > 0 && (
+                  <span className="bg-bg-tertiary px-2 py-0.5 rounded-full text-xs">
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       </header>
 
-      <div className="p-8">
-        {/* Search and Filters */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex-1 max-w-md">
-            <input
-              type="text"
-              placeholder="검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input w-full"
-            />
-          </div>
-
-          <div className="flex items-center gap-4">
-            {activeTab !== 'blocked' && (
-              <button className="btn btn-ghost" onClick={handleExport}>
-                📥 내보내기
-              </button>
-            )}
-            <button className="btn btn-ghost" onClick={fetchData}>
-              🔄 새로고침
-            </button>
-          </div>
-        </div>
+      <div className="flex-1 overflow-auto p-6">
 
         {/* Content */}
         <div className="card p-0 overflow-hidden">
@@ -611,6 +739,67 @@ const AdminPage = () => {
             setEditingCompany(null)
           }}
         />
+      </Modal>
+
+      {/* Confirm Modal */}
+      <Modal
+        isOpen={confirmModal.show}
+        onClose={() => setConfirmModal(prev => ({ ...prev, show: false }))}
+        title={confirmModal.title}
+        size="sm"
+      >
+        <div className="p-6">
+          <div className="flex items-start gap-4 mb-6">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+              confirmModal.type === 'danger' ? 'bg-red-500/20' :
+              confirmModal.type === 'warning' ? 'bg-yellow-500/20' :
+              'bg-blue-500/20'
+            }`}>
+              {confirmModal.type === 'danger' ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+              ) : confirmModal.type === 'warning' ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-yellow-400">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-400">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              )}
+            </div>
+            <p className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
+              {confirmModal.message}
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setConfirmModal(prev => ({ ...prev, show: false }))}
+              className="px-4 py-2 text-sm font-medium bg-bg-tertiary hover:bg-bg-secondary border border-border rounded-lg transition-all"
+            >
+              취소
+            </button>
+            <button
+              onClick={confirmModal.onConfirm}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                confirmModal.type === 'danger'
+                  ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30'
+                  : confirmModal.type === 'warning'
+                  ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30'
+                  : 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30'
+              }`}
+            >
+              확인
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

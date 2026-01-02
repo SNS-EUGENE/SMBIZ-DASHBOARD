@@ -1,0 +1,46 @@
+/* SMBIZ 데이터 추출 버튼 스타일 */
+#smbiz-copy-container {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 99999;
+}
+
+.smbiz-copy-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s ease;
+}
+
+.smbiz-copy-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+}
+
+.smbiz-copy-button:active {
+  transform: translateY(0);
+}
+
+.smbiz-copy-button.success {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.smbiz-copy-button.error {
+  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.smbiz-copy-button svg {
+  flex-shrink: 0;
+}

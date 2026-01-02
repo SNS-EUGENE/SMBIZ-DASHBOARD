@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
+import { format } from 'date-fns'
 import { api } from '../lib/supabase'
+import { useToast } from './Toast'
 
 const EQUIPMENT_TYPES = ['AS360', 'MICRO', 'XL', 'XXL', '알파데스크', '알파테이블', 'Compact']
 
-const ReservationForm = ({ reservation, onSave, onCancel }) => {
+const ReservationForm = ({ reservation, defaultDate, onSave, onCancel }) => {
+  const toast = useToast()
   const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -38,8 +41,13 @@ const ReservationForm = ({ reservation, onSave, onCancel }) => {
         is_seminar: reservation.is_seminar || false,
         notes: reservation.notes || '',
       })
+    } else if (defaultDate) {
+      setFormData(prev => ({
+        ...prev,
+        reservation_date: format(defaultDate, 'yyyy-MM-dd')
+      }))
     }
-  }, [reservation])
+  }, [reservation, defaultDate])
 
   const fetchCompanies = async () => {
     const { data } = await api.companies.getAll()
@@ -67,17 +75,17 @@ const ReservationForm = ({ reservation, onSave, onCancel }) => {
     e.preventDefault()
 
     if (!formData.company_id) {
-      alert('기업을 선택해주세요.')
+      toast.warning('기업을 선택해주세요.')
       return
     }
 
     if (!formData.reservation_date) {
-      alert('예약 날짜를 선택해주세요.')
+      toast.warning('예약 날짜를 선택해주세요.')
       return
     }
 
     if (formData.equipment_types.length === 0) {
-      alert('장비를 하나 이상 선택해주세요.')
+      toast.warning('장비를 하나 이상 선택해주세요.')
       return
     }
 
@@ -125,9 +133,10 @@ const ReservationForm = ({ reservation, onSave, onCancel }) => {
         if (error) throw error
       }
 
+      toast.success(reservation?.id ? '예약이 수정되었습니다.' : '예약이 추가되었습니다.')
       onSave()
     } catch (error) {
-      alert('저장 실패: ' + error.message)
+      toast.error('저장 실패: ' + error.message)
     } finally {
       setLoading(false)
     }

@@ -1,13 +1,13 @@
 # SMBIZ Dashboard - 프로젝트 현황
 
-> 최종 업데이트: 2026-01-02 (3차 업데이트)
+> 최종 업데이트: 2026-01-02 (4차 업데이트)
 
 ## 📊 프로젝트 개요
 
 디지털 콘텐츠 제작실 예약 관리 시스템
 - **기술 스택**: React + Vite + Supabase + Tailwind CSS
 - **디자인**: macOS 스타일 glassmorphism
-- **상태**: 개발 중 (메인/통계/관리 페이지 완료)
+- **상태**: 개발 완료 (핵심 기능 구현 완료)
 
 ---
 
@@ -61,7 +61,14 @@
 - [x] 검색 및 필터 기능
 - [x] 모달 기반 폼 UI
 
-### 8. 컴포넌트 구조
+### 8. UX 개선 (2026-01-02 추가)
+- [x] 토스트 알림 시스템 구현 (성공/에러/경고/정보)
+- [x] 에러 바운더리 추가 (전역 오류 처리)
+- [x] 메인 페이지 예약 추가 버튼
+- [x] CSV 내보내기 기능 (기업/예약/장비)
+- [x] 모든 alert() 호출을 toast 알림으로 교체
+
+### 9. 컴포넌트 구조
 ```
 src/
 ├── components/
@@ -71,196 +78,126 @@ src/
 │   ├── TimelineView.jsx      ✅ 타임라인 뷰
 │   ├── Modal.jsx             ✅ 공통 모달 컴포넌트
 │   ├── ReservationForm.jsx   ✅ 예약 추가/수정 폼
-│   └── CompanyForm.jsx       ✅ 기업 추가/수정 폼
+│   ├── CompanyForm.jsx       ✅ 기업 추가/수정 폼
+│   ├── Toast.jsx             ✅ 토스트 알림 시스템
+│   └── ErrorBoundary.jsx     ✅ 에러 바운더리
 ├── pages/
 │   ├── MainPage.jsx          ✅ 메인 페이지
 │   ├── StatsPage.jsx         ✅ 통계 페이지
 │   └── AdminPage.jsx         ✅ 관리 페이지
 └── lib/
-    └── supabase.js           ✅ Supabase 클라이언트 & API
+    ├── supabase.js           ✅ Supabase 클라이언트 & API
+    └── exportUtils.js        ✅ CSV 내보내기 유틸리티
 ```
 
 ---
 
 ## ⚠️ 알려진 이슈
 
-### 1. 🔴 엑셀 옵션 파싱 오류로 인한 장비 매핑 누락 (심각)
-
-**증상**
-- 상단 예약 건수: 표시됨 (554건)
-- 타임라인: 일부만 표시됨 (66건만 장비 매핑 있음)
-- **88%의 예약이 타임라인에 표시되지 않음!**
-
-**근본 원인 (2025-12-31 분석 완료)**
-```
-📋 전체 예약 수 (reservations 테이블): 554건
-🔗 장비 매핑이 있는 예약: 66건
-❌ 장비 매핑이 없는 예약: 488건
-```
-
-**원인 분석**
-1. `facilityReserve.xlsx`의 옵션 컬럼 포맷: `"MICRO /  / AS360"` (슬래시로 구분)
-2. `upload-excel-data.js`의 `parseEquipmentOptions()` 함수: `split('\n')` (줄바꿈으로 파싱)
-3. **포맷 불일치로 장비 정보가 파싱되지 않음**
-
-**문제 코드** (`scripts/upload-excel-data.js:78-86`)
-```javascript
-function parseEquipmentOptions(optionsStr) {
-  if (!optionsStr) return []
-  return optionsStr
-    .split('\n')  // ❌ 문제: 실제 데이터는 '/'로 구분됨
-    .map(t => t.trim())
-    .filter(Boolean)
-    .map(t => equipmentTypeMapping[t] || t)
-    .filter(t => ['XXL', 'XL', 'MICRO', 'AS360', 'Compact', '알파데스크', '알파테이블'].includes(t))
-}
-```
-
-**실제 엑셀 옵션 데이터 예시**
-```
-"XL" - 68건
-"알파테이블" - 61건
-"MICRO /  / AS360" - 32건
-"XXL /  / 알파테이블" - 25건
-"패션스튜디오 /  / XXL /  / Compact /  / 알파테이블 / " - 25건
-```
-
-**해결 방안**
-1. **옵션 A (권장)**: 업로드 스크립트 수정 후 DB 클리어 & 재업로드
-   - `parseEquipmentOptions()` 함수에서 `/`와 `\n` 둘 다 지원
-   - DB 완전 초기화 후 다시 업로드
-2. **옵션 B**: 기존 예약 유지, reservation_equipment 매핑만 재생성
-   - 기존 reservations 테이블은 유지
-   - 엑셀 재파싱하여 reservation_equipment만 추가
-
-**우선순위**: 🔴 매우 높음 - 전체 예약의 88%가 표시 안 됨
+### 해결됨
+- ✅ 엑셀 옵션 파싱 오류 해결 (2026-01-02)
+- ✅ 디버그 로그 제거 완료
+- ✅ equipment_types null 처리 완료
 
 ---
 
-### 2. 디버그 로그 제거 필요
+## 📋 완료된 작업 목록
 
-**위치**: `src/components/TimelineView.jsx:28-36`
+### ✅ 긴급 작업 (모두 완료)
 
-```javascript
-// 제거 필요
-if (hasTimeSlot && reservations.length > 0 && equipment === 'AS360') {
-  console.log('Debug equipment_types:', {
-    company: r.company_name,
-    looking_for: equipment,
-    actual_array: r.equipment_types,
-    array_contents: JSON.stringify(r.equipment_types),
-    hasEquipment
-  })
-}
-```
-
-**우선순위**: 🟡 중간 - 프로덕션 배포 전 필수
-
----
-
-## 📋 해야 할 작업
-
-### ✅ 완료된 긴급 작업
-
-1. **엑셀 옵션 파싱 수정 & DB 재업로드** ✅ 완료 (2026-01-02)
+1. **엑셀 옵션 파싱 수정 & DB 재업로드** ✅
    - [x] `parseEquipmentOptions()` 함수 수정 (`/`, `\r\n` 구분자 지원)
    - [x] 예약-장비 매핑 인덱스 불일치 문제 해결
    - [x] 중복 매핑 제거 로직 추가
    - [x] DB 클리어 후 재업로드 완료
    - [x] 타임라인 정상 표시 확인 (66개 → 1110개 매핑)
 
-2. **상단바 통합 레이아웃** ✅ 완료 (2026-01-02)
+2. **상단바 통합 레이아웃** ✅
    - [x] 전체 상단바로 통합 (SMBIZ 디지털콘텐츠제작실)
    - [x] 사이드바 높이 문제 해결
-   - [x] 시계 폰트 mono 적용 (`font-mono-num` 클래스)
+   - [x] 시계 폰트 mono 적용
 
----
-
-### ✅ 완료된 긴급 작업 (추가)
-
-3. **디버그 로그 및 불필요한 UI 제거** ✅ 완료 (2026-01-02)
+3. **디버그 로그 및 불필요한 UI 제거** ✅
    - [x] TimelineView.jsx의 console.log 제거
    - [x] "예약이 없습니다" empty state 텍스트 제거
 
----
+### ✅ 중간 우선순위 작업 (모두 완료)
 
-### ✅ 완료된 중간 우선순위 작업 (2026-01-02)
-
-2. **노쇼 예약 금지 기능** ✅ 완료
-   - [x] `companies` 테이블에 `blocked_until` 필드 사용
+4. **노쇼 예약 금지 기능** ✅
    - [x] 노쇼 발생 시 1주일 예약 금지 처리
    - [x] 예약 시 차단 상태 체크
    - [x] 관리 페이지에서 차단 해제 기능
 
-3. **통계 페이지 구현** (`/stats`) ✅ 완료
+5. **통계 페이지 구현** (`/stats`) ✅
    - [x] 월/연도별 예약 통계
    - [x] 장비별 사용률
    - [x] 월별/일별 트렌드
-   - [x] Recharts 연동
 
-4. **관리 페이지 구현** (`/admin`) ✅ 완료
+6. **관리 페이지 구현** (`/admin`) ✅
    - [x] 예약 추가/수정/삭제 모달
    - [x] 기업 추가/수정/삭제 모달
    - [x] 차단 기업 관리
 
-5. **예약 CRUD 기능** ✅ 완료
-   - [x] 예약 생성 API 연동
-   - [x] 예약 수정 API 연동
-   - [x] 예약 취소/삭제 API 연동
-   - [x] 예약 상태 변경 (confirmed, pending, completed, cancelled, no_show)
+7. **예약 CRUD 기능** ✅
+   - [x] 예약 생성/수정/취소/삭제 API 연동
+   - [x] 예약 상태 변경
+
+### ✅ UX 개선 (모두 완료)
+
+8. **토스트 알림 시스템** ✅
+   - [x] ToastProvider 컨텍스트 구현
+   - [x] success/error/warning/info 4가지 타입
+   - [x] 자동 사라짐 (3초)
+   - [x] 슬라이드 인 애니메이션
+
+9. **에러 바운더리** ✅
+   - [x] 전역 에러 캐치
+   - [x] 사용자 친화적 오류 페이지
+   - [x] 새로고침/홈으로 이동 버튼
+
+10. **데이터 내보내기** ✅
+    - [x] CSV 내보내기 (Excel 호환)
+    - [x] 기업 목록 내보내기
+    - [x] 예약 목록 내보내기
+    - [x] 장비 목록 내보내기
+    - [x] 한글 인코딩 지원 (BOM)
+
+11. **메인 페이지 예약 추가** ✅
+    - [x] 상단바에 "예약 추가" 버튼
+    - [x] 선택된 날짜로 자동 설정
 
 ---
 
-### 🟡 우선순위: 낮음 (부가 기능)
+## 🟡 향후 개선 가능 사항 (선택적)
 
-6. **검색 및 필터**
-   - [ ] 회사명으로 예약 검색
-   - [ ] 장비별 필터
-   - [ ] 상태별 필터
-   - [ ] 날짜 범위 검색
+### 반응형 & 접근성
+- [ ] 모바일 반응형 최적화
+- [ ] 태블릿 레이아웃
+- [ ] 키보드 네비게이션
+- [ ] 스크린 리더 지원
 
-7. **데이터 시각화**
-   - [ ] 장비 사용률 차트
-   - [ ] 월별 예약 트렌드
-   - [ ] 인기 시간대 분석
-   - [ ] 회사별 이용 통계
-
-8. **반응형 & 접근성**
-   - [ ] 모바일 반응형 최적화
-   - [ ] 태블릿 레이아웃
-   - [ ] 키보드 네비게이션
-   - [ ] 스크린 리더 지원
-
-9. **내보내기 기능**
-   - [ ] Excel 내보내기
-   - [ ] PDF 보고서
-   - [ ] 인쇄 최적화
-
-10. **기타 개선사항**
-    - [ ] 다크모드 토글 (현재 항상 다크)
-    - [ ] 알림/토스트 시스템
-    - [ ] 오프라인 지원
-    - [ ] 에러 바운더리 추가
+### 추가 기능
+- [ ] PDF 보고서 생성
+- [ ] 인쇄 최적화
+- [ ] 다크모드 토글 (현재 항상 다크)
+- [ ] 오프라인 지원
+- [ ] 회사명 검색 자동완성
+- [ ] 장비별 가용 현황 표시
 
 ---
 
 ## 🔧 기술 부채
 
-### 즉시 해결 필요
-- ✅ equipment_types null 처리 (완료)
-- ✅ 디버그 로그 제거 (완료)
+### 해결됨
+- ✅ equipment_types null 처리
+- ✅ 디버그 로그 제거
+- ✅ alert() 호출 제거 (toast로 교체)
 
-### 중기 계획
+### 향후 검토
 - TypeScript 마이그레이션 검토
-- 에러 처리 개선
-- 로딩 상태 UX 개선
 - 테스트 코드 작성
-
-### 장기 계획
-- 오프라인 캐싱 전략
-- PWA 전환
 - 실시간 동기화 (Supabase Realtime)
-- 다국어 지원
+- PWA 전환
 
 ---
 
@@ -276,13 +213,16 @@ smbiz-dashboard/
 │   │   ├── TimelineView.jsx      # 예약 타임라인 뷰
 │   │   ├── Modal.jsx             # 공통 모달 컴포넌트
 │   │   ├── ReservationForm.jsx   # 예약 추가/수정 폼
-│   │   └── CompanyForm.jsx       # 기업 추가/수정 폼
+│   │   ├── CompanyForm.jsx       # 기업 추가/수정 폼
+│   │   ├── Toast.jsx             # 토스트 알림 시스템
+│   │   └── ErrorBoundary.jsx     # 에러 바운더리
 │   ├── pages/
 │   │   ├── MainPage.jsx          # 메인 페이지 (예약 현황)
 │   │   ├── StatsPage.jsx         # 통계 페이지
 │   │   └── AdminPage.jsx         # 관리 페이지
 │   ├── lib/
-│   │   └── supabase.js           # Supabase 클라이언트 & API
+│   │   ├── supabase.js           # Supabase 클라이언트 & API
+│   │   └── exportUtils.js        # CSV 내보내기 유틸리티
 │   ├── styles/
 │   │   └── index.css             # 글로벌 스타일
 │   ├── App.jsx                   # 라우터 설정
@@ -349,27 +289,8 @@ Compact: #6366F1 (Indigo)
 
 ---
 
-## 🚀 다음 단계
-
-### 1단계: 추가 기능 개선 (우선순위 낮음)
-1. 회사명 검색 자동완성
-2. 예약 필터 (날짜 범위, 상태별)
-3. 장비별 가용 현황 표시
-
-### 2단계: UX 개선
-1. 토스트 알림 시스템 구현
-2. 로딩 스피너 개선
-3. 폼 유효성 검사 강화
-
-### 3단계: 데이터 내보내기
-1. Excel 내보내기 기능
-2. PDF 보고서 생성
-3. 인쇄 최적화
-
----
-
 ## 📞 연락처
 
-- **개발**: Claude Sonnet 4.5
+- **개발**: Claude (Anthropic)
 - **프로젝트**: SMBIZ Dashboard
 - **Repository**: https://github.com/SNS-EUGENE/SMBIZ-DASHBOARD

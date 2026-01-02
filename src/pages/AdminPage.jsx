@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { api } from '../lib/supabase'
+import { exportCompanies, exportReservations, exportEquipment } from '../lib/exportUtils'
 import Modal from '../components/Modal'
 import ReservationForm from '../components/ReservationForm'
 import CompanyForm from '../components/CompanyForm'
+import { useToast } from '../components/Toast'
 
 const AdminPage = () => {
+  const toast = useToast()
   const [activeTab, setActiveTab] = useState('companies')
   const [companies, setCompanies] = useState([])
   const [blockedCompanies, setBlockedCompanies] = useState([])
@@ -52,9 +55,9 @@ const AdminPage = () => {
 
     const { error } = await api.reservations.markNoShow(reservationId, companyId)
     if (error) {
-      alert('노쇼 처리 실패: ' + error.message)
+      toast.error('노쇼 처리 실패: ' + error.message)
     } else {
-      alert('노쇼 처리되었습니다. 해당 기업은 1주일간 예약이 제한됩니다.')
+      toast.warning('노쇼 처리 완료. 해당 기업은 1주일간 예약이 제한됩니다.')
       fetchData()
     }
   }
@@ -66,9 +69,9 @@ const AdminPage = () => {
 
     const { error } = await api.companies.unblock(companyId)
     if (error) {
-      alert('차단 해제 실패: ' + error.message)
+      toast.error('차단 해제 실패: ' + error.message)
     } else {
-      alert('예약 제한이 해제되었습니다.')
+      toast.success('예약 제한이 해제되었습니다.')
       fetchData()
     }
   }
@@ -97,8 +100,9 @@ const AdminPage = () => {
 
     const { error } = await api.reservations.cancel(id)
     if (error) {
-      alert('예약 취소 실패: ' + error.message)
+      toast.error('예약 취소 실패: ' + error.message)
     } else {
+      toast.success('예약이 취소되었습니다.')
       fetchData()
     }
   }
@@ -110,8 +114,9 @@ const AdminPage = () => {
 
     const { error } = await api.reservations.delete(id)
     if (error) {
-      alert('예약 삭제 실패: ' + error.message)
+      toast.error('예약 삭제 실패: ' + error.message)
     } else {
+      toast.success('예약이 삭제되었습니다.')
       fetchData()
     }
   }
@@ -140,8 +145,9 @@ const AdminPage = () => {
 
     const { error } = await api.companies.delete(id)
     if (error) {
-      alert('기업 삭제 실패: ' + error.message)
+      toast.error('기업 삭제 실패: ' + error.message)
     } else {
+      toast.success('기업이 삭제되었습니다.')
       fetchData()
     }
   }
@@ -152,6 +158,20 @@ const AdminPage = () => {
       handleAddCompany()
     } else if (activeTab === 'reservations') {
       handleAddReservation()
+    }
+  }
+
+  // Export handler
+  const handleExport = () => {
+    if (activeTab === 'companies') {
+      exportCompanies(companies)
+      toast.success('기업 목록을 내보냈습니다.')
+    } else if (activeTab === 'reservations') {
+      exportReservations(reservations)
+      toast.success('예약 목록을 내보냈습니다.')
+    } else if (activeTab === 'equipment') {
+      exportEquipment(equipment)
+      toast.success('장비 목록을 내보냈습니다.')
     }
   }
 
@@ -525,9 +545,11 @@ const AdminPage = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="btn btn-ghost">
-              🔽 필터
-            </button>
+            {activeTab !== 'blocked' && (
+              <button className="btn btn-ghost" onClick={handleExport}>
+                📥 내보내기
+              </button>
+            )}
             <button className="btn btn-ghost" onClick={fetchData}>
               🔄 새로고침
             </button>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/supabase'
+import { useToast } from './Toast'
 
 const DISTRICTS = [
   '강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구',
@@ -13,6 +14,7 @@ const INDUSTRIES = [
 ]
 
 const CompanyForm = ({ company, onSave, onCancel }) => {
+  const toast = useToast()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
@@ -84,7 +86,7 @@ const CompanyForm = ({ company, onSave, onCancel }) => {
     e.preventDefault()
 
     if (!formData.name.trim()) {
-      alert('기업명을 입력해주세요.')
+      toast.warning('기업명을 입력해주세요.')
       return
     }
 
@@ -99,9 +101,10 @@ const CompanyForm = ({ company, onSave, onCancel }) => {
         if (error) throw error
       }
 
+      toast.success(company?.id ? '기업 정보가 수정되었습니다.' : '기업이 추가되었습니다.')
       onSave()
     } catch (error) {
-      alert('저장 실패: ' + error.message)
+      toast.error('저장 실패: ' + error.message)
     } finally {
       setLoading(false)
     }

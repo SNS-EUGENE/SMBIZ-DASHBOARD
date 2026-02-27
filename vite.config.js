@@ -12,10 +12,19 @@ export default defineConfig({
       '@': '/src',
       '@components': '/src/components',
       '@pages': '/src/pages',
-      '@utils': '/src/utils',
-      '@hooks': '/src/hooks',
       '@lib': '/src/lib',
       '@styles': '/src/styles'
+    }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['react', 'react-dom', 'react-router-dom'],
+          'charts': ['recharts'],
+          'date': ['date-fns']
+        }
+      }
     }
   }
 })

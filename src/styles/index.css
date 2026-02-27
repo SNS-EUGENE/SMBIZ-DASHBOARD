@@ -1,6 +1,3 @@
-/* Pretendard 폰트 로드 - 최상단에 위치 */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -15,6 +12,8 @@
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   }
 
   /* Monospace font for numbers (clock, stats, etc.) */
@@ -46,14 +45,64 @@
   ::selection {
     @apply bg-primary/20 text-text-primary;
   }
+
+  /* Firefox scrollbar styling for scrollable elements */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print Styles */
+@media print {
+  /* Hide interactive elements */
+  nav,
+  aside,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Full width content */
+  main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Optimize colors for printing */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Show URLs for links */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+  }
+
+  /* Page breaks */
+  .card,
+  .table {
+    page-break-inside: avoid;
+  }
 }
 
 @layer components {
-  /* Raycast-style Command Palette */
-  .command-palette {
-    @apply bg-bg-elevated rounded-lg shadow-xl border border-border;
-  }
-
   /* Card Component - Modern style */
   .card {
     @apply bg-bg-secondary/60 border border-border/60 rounded-xl p-6;
@@ -67,7 +116,7 @@
 
   /* Button Variants */
   .btn {
-    @apply px-4 py-2 rounded-md font-medium transition-all duration-200;
+    @apply px-4 py-2 rounded-md font-medium transition-all duration-200 whitespace-nowrap;
     @apply focus:outline-none focus:ring-2 focus:ring-primary/50;
   }
 
@@ -96,7 +145,7 @@
 
   /* Badge Component */
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap;
   }
 
   /* Status Badges */
@@ -116,9 +165,12 @@
     @apply bg-primary/10 text-primary border border-primary/20;
   }
 
-  /* Equipment Badges */
-  .badge-equipment {
-    @apply px-3 py-1 rounded-md text-xs font-medium border;
+  .badge-info {
+    @apply bg-blue-500/10 text-blue-400 border border-blue-500/20;
+  }
+
+  .badge-muted {
+    @apply bg-white/5 text-text-tertiary border border-white/10;
   }
 
   /* Table Styles */
@@ -127,16 +179,30 @@
   }
 
   .table th {
-    @apply text-left text-xs font-semibold text-text-tertiary uppercase tracking-wider;
-    @apply py-3 px-4 border-b border-border;
+    @apply text-xs font-semibold text-text-tertiary tracking-wider;
+    @apply py-2.5 px-3 border-b-2 border-border;
   }
 
   .table td {
-    @apply py-3 px-4 border-b border-border text-sm;
+    @apply py-2.5 px-3 border-b border-border/60 text-sm;
   }
 
   .table tr:hover td {
-    @apply bg-bg-tertiary/50;
+    @apply bg-bg-tertiary/30;
+  }
+
+  /* Column alignment helpers: th and td match */
+  .table .col-right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .table .col-left {
+    text-align: left;
+  }
+
+  .table .col-center {
+    text-align: center;
   }
 
   /* Divider */
@@ -167,28 +233,6 @@
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary;
   }
 
-  /* Truncate with custom lines */
-  .line-clamp-1 {
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .line-clamp-3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
   /* Toast Animation */
   .animate-slide-in {
     animation: slideIn 0.3s ease-out;
@@ -205,19 +249,4 @@
     }
   }
 
-  /* Fade In Animation */
-  .animate-fade-in {
-    animation: fadeIn 0.2s ease-out;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
 }

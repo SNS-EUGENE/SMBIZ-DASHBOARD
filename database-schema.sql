@@ -9,12 +9,13 @@ CREATE TABLE companies (
   name VARCHAR(255) NOT NULL,
   representative VARCHAR(100) NOT NULL,
   business_number VARCHAR(20) UNIQUE,
-  company_size VARCHAR(20) CHECK (company_size IN ('소기업', '중기업', '대기업', '스타트업', '1인기업')),
+  company_size VARCHAR(20) CHECK (company_size IN ('소기업', '중기업', '대기업', '스타트업', '1인기업', '소공인')),
   industry VARCHAR(100) NOT NULL,
   contact VARCHAR(20) NOT NULL,
   email VARCHAR(255),
   address TEXT,
   district VARCHAR(50), -- 서울시 자치구
+  blocked_until TIMESTAMP WITH TIME ZONE, -- 차단 해제 일시
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -56,20 +57,29 @@ CREATE TABLE reservations (
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   reservation_date DATE NOT NULL,
   time_slot VARCHAR(10) NOT NULL CHECK (time_slot IN ('morning', 'afternoon')), -- 09-13 / 14-18
-  status VARCHAR(20) DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')),
+  status VARCHAR(20) DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed', 'no_show')),
 
   -- 작업 유형별 시간 (분 단위)
-  work_2d INTEGER DEFAULT 0,
-  work_3d INTEGER DEFAULT 0,
-  work_video INTEGER DEFAULT 0,
-  work_advanced INTEGER DEFAULT 0,
+  work_2d INTEGER DEFAULT 0 CHECK (work_2d >= 0),
+  work_3d INTEGER DEFAULT 0 CHECK (work_3d >= 0),
+  work_video INTEGER DEFAULT 0 CHECK (work_video >= 0),
+  work_advanced INTEGER DEFAULT 0 CHECK (work_advanced >= 0),
 
   -- 참석 인원
-  attendees INTEGER DEFAULT 1,
+  attendees INTEGER DEFAULT 1 CHECK (attendees >= 1),
 
   -- 교육/세미나
   is_training BOOLEAN DEFAULT false,
   is_seminar BOOLEAN DEFAULT false,
+
+  -- smbiz.sba.kr 스크래핑 필드
+  reserve_idx VARCHAR(50) UNIQUE,            -- smbiz 원본 예약 ID
+  end_date DATE,                              -- 예약 종료일
+  start_time VARCHAR(10),                     -- 원본 시작시간 (e.g. "09시")
+  end_time VARCHAR(10),                       -- 원본 종료시간 (e.g. "13시")
+  business_license_url TEXT,                  -- 사업자등록증 Storage URL
+  small_biz_cert_url TEXT,                    -- 소상공인확인서 Storage URL
+  request_notes TEXT,                         -- 요청사항
 
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -83,6 +93,9 @@ CREATE INDEX idx_reservations_status ON reservations(status);
 
 -- 복합 인덱스 (날짜 + 시간대로 예약 조회 최적화)
 CREATE INDEX idx_reservations_date_slot ON reservations(reservation_date, time_slot);
+
+-- smbiz 원본 ID 인덱스
+CREATE INDEX idx_reservations_reserve_idx ON reservations(reserve_idx);
 
 -- ================================================
 
@@ -104,7 +117,33 @@ CREATE INDEX idx_reservation_equipment_equipment ON reservation_equipment(equipm
 
 -- ================================================
 
--- 5. 통계 뷰 (가동률 계산용)
+-- 5. 만족도 조사 테이블
+CREATE TABLE satisfaction_surveys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reservation_id UUID UNIQUE REFERENCES reservations(id) ON DELETE SET NULL,
+  overall_rating SMALLINT CHECK (overall_rating BETWEEN 1 AND 5),
+  category_ratings JSONB DEFAULT '{}',
+  comment TEXT,
+  improvement_request TEXT,
+  privacy_consent CHAR(1) NOT NULL DEFAULT 'Y' CHECK (privacy_consent IN ('Y', 'N')),
+  feedback_status VARCHAR(20) DEFAULT 'unreviewed' CHECK (feedback_status IN ('unreviewed', 'reviewed', 'action_taken')),
+  feedback_note TEXT,
+  submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 인덱스
+CREATE INDEX idx_surveys_reservation ON satisfaction_surveys(reservation_id);
+CREATE INDEX idx_surveys_submitted_at ON satisfaction_surveys(submitted_at);
+CREATE INDEX idx_surveys_feedback_status ON satisfaction_surveys(feedback_status);
+
+-- 복합 인덱스 (상태+날짜 조합 최적화)
+CREATE INDEX idx_reservations_status_date ON reservations(status, reservation_date);
+
+-- ================================================
+
+-- 6. 통계 뷰 (가동률 계산용)
 CREATE OR REPLACE VIEW equipment_utilization AS
 SELECT
   e.id as equipment_id,
@@ -192,32 +231,42 @@ ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE equipment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reservation_equipment ENABLE ROW LEVEL SECURITY;
+ALTER TABLE satisfaction_surveys ENABLE ROW LEVEL SECURITY;
 
--- 관리자 정책 (모든 권한)
-CREATE POLICY "Enable all access for authenticated users" ON companies
-  FOR ALL USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Enable all access for authenticated users" ON equipment
-  FOR ALL USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Enable all access for authenticated users" ON reservations
-  FOR ALL USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Enable all access for authenticated users" ON reservation_equipment
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- 읽기 전용 정책 (뷰어 역할용)
-CREATE POLICY "Enable read access for all users" ON companies
+-- 공개 읽기 정책
+CREATE POLICY "companies_select_public" ON companies
+  FOR SELECT USING (true);
+CREATE POLICY "equipment_select_public" ON equipment
+  FOR SELECT USING (true);
+CREATE POLICY "reservations_select_public" ON reservations
+  FOR SELECT USING (true);
+CREATE POLICY "reservation_equipment_select_public" ON reservation_equipment
+  FOR SELECT USING (true);
+CREATE POLICY "surveys_select_public" ON satisfaction_surveys
   FOR SELECT USING (true);
 
-CREATE POLICY "Enable read access for all users" ON equipment
-  FOR SELECT USING (true);
+-- 인증 사용자 쓰기 정책
+CREATE POLICY "companies_modify_authenticated" ON companies
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "equipment_modify_authenticated" ON equipment
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "reservations_modify_authenticated" ON reservations
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "reservation_equipment_modify_authenticated" ON reservation_equipment
+  FOR ALL USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable read access for all users" ON reservations
-  FOR SELECT USING (true);
-
-CREATE POLICY "Enable read access for all users" ON reservation_equipment
-  FOR SELECT USING (true);
+-- 만족도 조사: 공개 제출 허용 (공개 페이지용), 수정/삭제는 인증 필요
+CREATE POLICY "surveys_insert_public" ON satisfaction_surveys
+  FOR INSERT WITH CHECK (true);
+CREATE POLICY "surveys_modify_authenticated" ON satisfaction_surveys
+  FOR UPDATE USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "surveys_delete_authenticated" ON satisfaction_surveys
+  FOR DELETE USING (auth.role() = 'authenticated');
 
 -- ================================================
 
@@ -240,25 +289,38 @@ CREATE TRIGGER update_equipment_updated_at BEFORE UPDATE ON equipment
 CREATE TRIGGER update_reservations_updated_at BEFORE UPDATE ON reservations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_satisfaction_surveys_updated_at BEFORE UPDATE ON satisfaction_surveys
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ================================================
 
--- 11. 예약 충돌 방지 함수
-CREATE OR REPLACE FUNCTION check_reservation_conflict()
+-- 11. 장비 예약 충돌 방지 함수 (reservation_equipment INSERT 시 체크)
+CREATE OR REPLACE FUNCTION check_equipment_conflict()
 RETURNS TRIGGER AS $$
 DECLARE
   conflict_count INTEGER;
+  res_date DATE;
+  res_slot VARCHAR(10);
 BEGIN
-  -- 같은 날짜, 같은 시간대에 같은 장비가 이미 예약되어 있는지 확인
+  -- 해당 예약의 날짜와 시간대 조회
+  SELECT reservation_date, time_slot INTO res_date, res_slot
+  FROM reservations
+  WHERE id = NEW.reservation_id AND status NOT IN ('cancelled');
+
+  -- 취소된 예약이거나 존재하지 않으면 통과
+  IF res_date IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- 같은 날짜, 같은 시간대에 같은 장비가 다른 예약에 이미 배정되어 있는지 확인
   SELECT COUNT(*) INTO conflict_count
-  FROM reservations r
-  JOIN reservation_equipment re ON r.id = re.reservation_id
-  WHERE r.reservation_date = NEW.reservation_date
-    AND r.time_slot = NEW.time_slot
+  FROM reservation_equipment re
+  JOIN reservations r ON re.reservation_id = r.id
+  WHERE re.equipment_id = NEW.equipment_id
+    AND r.reservation_date = res_date
+    AND r.time_slot = res_slot
     AND r.status NOT IN ('cancelled')
-    AND re.equipment_id IN (
-      SELECT equipment_id FROM reservation_equipment WHERE reservation_id = NEW.id
-    )
-    AND r.id != NEW.id;
+    AND re.reservation_id != NEW.reservation_id;
 
   IF conflict_count > 0 THEN
     RAISE EXCEPTION '해당 시간대에 이미 예약된 장비가 있습니다.';
@@ -268,12 +330,53 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER prevent_reservation_conflict BEFORE INSERT OR UPDATE ON reservations
-  FOR EACH ROW EXECUTE FUNCTION check_reservation_conflict();
+CREATE TRIGGER prevent_equipment_conflict BEFORE INSERT ON reservation_equipment
+  FOR EACH ROW EXECUTE FUNCTION check_equipment_conflict();
+
+CREATE TRIGGER prevent_equipment_conflict_update BEFORE UPDATE ON reservation_equipment
+  FOR EACH ROW EXECUTE FUNCTION check_equipment_conflict();
 
 -- ================================================
 
--- 12. 샘플 데이터 (테스트용)
+-- 12. 예약 자동 완료 처리 (confirmed → completed)
+-- 예약 시간대 종료 후 자동 전환 (cancelled, no_show 제외)
+CREATE OR REPLACE FUNCTION auto_complete_reservations()
+RETURNS INTEGER AS $$
+DECLARE
+  updated_count INTEGER;
+BEGIN
+  SET session_replication_role = 'replica';
+
+  UPDATE reservations
+  SET status = 'completed',
+      updated_at = NOW()
+  WHERE status = 'confirmed'
+    AND (
+      (time_slot = 'morning' AND (reservation_date + TIME '13:00') AT TIME ZONE 'Asia/Seoul' < NOW())
+      OR
+      (time_slot = 'afternoon' AND (reservation_date + TIME '18:00') AT TIME ZONE 'Asia/Seoul' < NOW())
+    );
+
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
+  SET session_replication_role = 'origin';
+  RETURN updated_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- pg_cron: 매 시간 정각 실행
+-- CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- SELECT cron.schedule('auto-complete-reservations', '0 * * * *', $$SELECT auto_complete_reservations()$$);
+
+-- ================================================
+
+-- 13. 개인정보 보호 뷰 (공개 API용)
+CREATE OR REPLACE VIEW companies_public AS
+SELECT id, name, company_size, industry, district, created_at
+FROM companies;
+
+-- ================================================
+
+-- 13. 샘플 데이터 (테스트용)
 -- 기업 데이터
 INSERT INTO companies (name, representative, business_number, company_size, industry, contact, district) VALUES
   ('위드넷', '최철웅', '123-45-67890', '소기업', 'XXL', '010-5920-8423', '종로구'),
@@ -315,3 +418,5 @@ FROM reservations r
 CROSS JOIN equipment e
 WHERE r.status = 'confirmed'
 LIMIT 10;
+
+-- ================================================

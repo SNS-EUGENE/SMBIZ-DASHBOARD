@@ -1,206 +1,184 @@
-# SMBIZ 디지털 콘텐츠 제작실 관리 시스템
+# SMBIZ Dashboard
 
-서울시 소상공인 허브 디지털 콘텐츠 제작실의 장비 예약 및 통계 관리 대시보드
+성수 디지털콘텐츠제작실(3F) 장비 예약 관리 대시보드
 
-## 🎨 디자인 레퍼런스
+## 기술 스택
 
-- **전반적 기조**: Raycast + Appsmith
-- **메인 페이지**: Raycast (커맨드 중심, 깔끔한 인터랙션)
-- **통계 페이지**: Mixpanel (전문적인 데이터 시각화)
-- **관리자 페이지**: Directus + Appsmith (모던 어드민 패널)
+- **Frontend**: React 18 + TypeScript + Vite
+- **Styling**: TailwindCSS (macOS-inspired dark theme)
+- **Database**: Supabase (PostgreSQL)
+- **Charts**: Recharts
+- **Auth**: Supabase Auth (email + password)
+- **Notifications**: KakaoWork Bot API (via Edge Function)
+- **Hosting**: Vercel (SPA + Cron)
+- **Font**: Pretendard
 
-## 🚀 시작하기
+## 주요 기능
 
-### 1. Node.js 설치
-Node.js 18+ 버전 필요
+### 예약 현황 (메인)
+- 날짜별 타임라인 뷰 (오전/오후, 장비 7종)
+- 달력 네비게이션, 실시간 시계
 
-### 2. 패키지 설치
+### 예약 관리
+- 예약 CRUD, 상태 변경 (신청/확정/완료/취소/노쇼)
+- Excel 내보내기 (월별/기간별)
+
+### 통계
+- 월별 가동률, 자치구별/업종별/기업규모별 분석
+- Recharts 기반 차트 시각화
+
+### 기업 / 장비 관리
+- 기업 CRUD, 장비 상태 관리
+
+### 점검 관리
+- 시설 일일점검 (캘린더 뷰)
+- 장비 주간점검 (주차별 체크리스트)
+
+### 만족도 조사
+- 내부 관리 + 외부 공개 설문 페이지 (`/survey`)
+- 예약 건별 만족도 평가 (5점 척도)
+
+### 설정
+- SMBIZ 예약 동기화 (수동/자동 1시간 Cron)
+- KakaoWork 알림 수신자 관리
+- 공휴일 관리, 확인자 설정
+
+### 인증
+- Supabase Auth 로그인 (이메일 + 비밀번호)
+- `/survey` 제외 전 페이지 보호
+- 세션 자동 유지 + 새로고침 시 유지
+
+### 알림 (KakaoWork)
+- 예약 생성/수정/취소 시 알림
+- 만족도조사 완료 시 알림
+- 시설/장비 점검 완료 시 알림
+- SMBIZ 동기화 신규/상태변경 알림
+
+## 프로젝트 구조
+
+```
+src/
+├── components/        # UI 컴포넌트
+│   ├── Layout.tsx     # 사이드바 + 헤더 + 하단탭
+│   ├── AuthProvider.tsx       # 인증 컨텍스트
+│   ├── ProtectedRoute.tsx     # 라우트 가드
+│   ├── TimelineView.tsx       # 타임라인 뷰
+│   ├── ReservationForm.tsx    # 예약 폼
+│   ├── ReservationDetailModal.tsx
+│   ├── SurveySubmissionForm.tsx
+│   ├── FacilityInspectionTab.tsx
+│   ├── EquipmentInspectionTab.tsx
+│   ├── HolidayManager.tsx
+│   ├── Modal.tsx / Toast.tsx / Calendar.tsx
+│   └── ...
+├── pages/             # 페이지
+│   ├── LoginPage.tsx
+│   ├── MainPage.tsx           # 예약 현황
+│   ├── ReservationsPage.tsx   # 예약 관리
+│   ├── StatsPage.tsx          # 통계
+│   ├── CompaniesPage.tsx      # 기업 관리
+│   ├── EquipmentPage.tsx      # 장비 관리
+│   ├── InspectionsPage.tsx    # 점검 관리
+│   ├── SurveysPage.tsx        # 만족도 관리
+│   ├── SurveyPage.tsx         # 외부 만족도조사 (공개)
+│   └── SettingsPage.tsx       # 설정
+├── lib/
+│   ├── supabase.ts    # Supabase 클라이언트 + API + Auth
+│   ├── notifications.ts       # KakaoWork 알림 헬퍼
+│   ├── dateUtils.ts / holidays.ts / exportUtils.ts
+│   └── utils.ts
+├── constants/         # 상수 (장비, 점검 항목 등)
+├── types/             # TypeScript 타입 정의
+└── App.tsx            # 라우팅
+
+supabase/functions/
+├── sync-reservations/ # SMBIZ 예약 동기화 Edge Function
+└── send-notification/ # KakaoWork 알림 발송 Edge Function
+
+api/
+└── sync-cron.ts       # Vercel Cron → sync-reservations 호출
+```
+
+## 시작하기
+
+### 1. 패키지 설치
+
 ```bash
 npm install
 ```
 
-### 3. 환경 변수 설정
-`.env.example` 파일을 복사해서 `.env` 생성
+### 2. 환경 변수
+
+`.env.example`을 복사하여 `.env` 생성:
 
 ```bash
 cp .env.example .env
 ```
 
-`.env` 파일에 Supabase 정보 입력:
 ```env
-VITE_SUPABASE_URL=your_supabase_url_here
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-### 4. Supabase 데이터베이스 설정
-`database-schema.sql` 파일을 Supabase SQL Editor에서 실행
+### 3. DB 스키마
 
-### 5. 개발 서버 실행
+`database-schema.sql`을 Supabase SQL Editor에서 실행
+
+### 4. 개발 서버
+
 ```bash
 npm run dev
 ```
 
-브라우저에서 `http://localhost:3000` 접속
+`http://localhost:3000` 접속
 
-## 📁 프로젝트 구조
+### 5. Supabase Auth 설정
 
-```
-smbiz-dashboard/
-├── src/
-│   ├── components/          # 재사용 가능한 컴포넌트
-│   │   ├── Layout.jsx       # 레이아웃 (사이드바 + 메인)
-│   │   ├── Calendar.jsx     # 달력 컴포넌트
-│   │   ├── TimelineView.jsx # 타임라인 뷰
-│   │   ├── Modal.jsx        # 모달 컴포넌트
-│   │   ├── Toast.jsx        # 토스트 알림
-│   │   ├── ReservationForm.jsx  # 예약 폼
-│   │   └── CompanyForm.jsx  # 기업 폼
-│   ├── pages/               # 페이지 컴포넌트
-│   │   ├── MainPage.jsx     # 예약 현황 (메인)
-│   │   ├── StatsPage.jsx    # 통계 대시보드
-│   │   └── AdminPage.jsx    # 관리자 페이지
-│   ├── lib/                 # 라이브러리
-│   │   └── supabase.js      # Supabase 클라이언트 + API
-│   ├── styles/              # 스타일
-│   │   └── index.css        # Tailwind + 커스텀 스타일
-│   ├── App.jsx              # 앱 라우터
-│   └── main.jsx             # 엔트리 포인트
-├── chrome-extension/        # SMBIZ 데이터 추출 확장 프로그램
-│   ├── manifest.json        # 확장 프로그램 설정
-│   ├── content.js           # 페이지 데이터 추출 스크립트
-│   ├── popup.html/js        # 팝업 UI
-│   └── icons/               # 아이콘
-├── database-schema.sql      # 데이터베이스 스키마
-├── package.json
-├── vite.config.js
-└── tailwind.config.js
+1. Authentication > Providers > Email 활성화
+2. Authentication > Users > Add User로 계정 생성
+
+## 배포
+
+### Vercel
+
+1. GitHub 연결 후 자동 배포
+2. Environment Variables 설정:
+
+| 변수 | 용도 |
+|------|------|
+| `VITE_SUPABASE_URL` | 프론트엔드 빌드 |
+| `VITE_SUPABASE_ANON_KEY` | 프론트엔드 빌드 |
+| `SUPABASE_URL` | Cron API |
+| `SUPABASE_ANON_KEY` | Cron API |
+| `CRON_SECRET` | Cron 엔드포인트 보호 |
+
+### Supabase Edge Functions
+
+```bash
+npx supabase functions deploy sync-reservations
+npx supabase functions deploy send-notification --no-verify-jwt
 ```
 
-## 🎯 주요 기능
+Edge Function secrets:
 
-### 📅 메인 페이지 - 예약 현황
-- **날짜 선택 달력**: 원하는 날짜의 예약 현황 확인
-- **타임라인 뷰**: 오전/오후 타임으로 나뉜 장비별 예약 현황
-- **실시간 시각**: 현재 시각 표시
-- **장비별 분류**: 7가지 장비 타입별 예약 상태
-
-**장비 종류**:
-- AS360 (Purple)
-- MICRO (Blue)
-- XL (Green)
-- XXL (Amber)
-- 알파데스크 (Pink)
-- 알파테이블 (Cyan)
-- Compact (Indigo)
-
-**시간대**:
-- 오전: 09:00 - 13:00 (4시간)
-- 오후: 14:00 - 18:00 (4시간)
-- 브레이크타임: 13:00 - 14:00 (1시간)
-
-### 📊 상세 페이지 - 통계
-- 월별/기간별 가동률 분석
-- 자치구별 이용 통계
-- 업종별 사용 패턴
-- 장비별 가동률 추이
-
-### ⚙️ 관리자 페이지
-- **기업 관리**: CRUD 기능
-- **예약 관리**: 예약 생성/수정/취소/노쇼 처리
-- **장비 관리**: 장비 상태 관리
-- **데이터 필터링**: 고급 검색 및 필터
-- **CSV 내보내기**: 데이터 다운로드
-
-### 🔌 Chrome Extension
-SMBIZ 관리자 페이지(smbiz.sba.kr)에서 예약 데이터를 추출하여 Dashboard에 자동 입력
-
-**설치 방법**:
-1. Chrome에서 `chrome://extensions` 접속
-2. "개발자 모드" 활성화
-3. "압축해제된 확장 프로그램을 로드합니다" 클릭
-4. `chrome-extension` 폴더 선택
-
-**사용 방법**:
-1. smbiz.sba.kr 예약 상세 페이지에서 "SMBIZ Dashboard로 복사" 버튼 클릭
-2. Dashboard 예약 추가 폼에서 "SMBIZ 붙여넣기" 버튼 클릭
-3. 기업 정보 자동 매칭 및 폼 자동 입력
-
-## 🎨 디자인 시스템
-
-### 컬러 팔레트
-```css
-Primary: #FF6363 (Raycast Red)
-Background: #0D0D0D, #1A1A1A, #242424
-Text: #FFFFFF, #A8A8A8, #6B6B6B
-Success: #00D9A5
-Warning: #FFB84D
-Danger: #FF6B6B
+```bash
+npx supabase secrets set KAKAOWORK_BOT_KEY=your_bot_key
+npx supabase secrets set SMBIZ_ADMIN_ID=your_id
+npx supabase secrets set SMBIZ_ADMIN_PW=your_pw
 ```
 
-### 타이포그래피
-- Font: Inter (Google Fonts)
-- 사이즈: 12px ~ 36px (Tailwind scale)
+## 장비 목록
 
-## 📦 기술 스택
+| 장비 | 코드 | 색상 |
+|------|------|------|
+| AS360 | `as360` | Purple |
+| MICRO | `micro` | Blue |
+| XL | `xl` | Green |
+| XXL | `xxl` | Amber |
+| Alpha Desk | `desk` | Pink |
+| Alpha Table | `table` | Cyan |
+| Compact | `compact` | Indigo |
 
-- **Frontend**: React 18
-- **Build Tool**: Vite
-- **Styling**: TailwindCSS
-- **Router**: React Router v6
-- **Database**: Supabase (PostgreSQL)
-- **Date Utils**: date-fns
-- **Charts**: Recharts
-- **State**: Zustand
-- **Animations**: Framer Motion
+## 라이센스
 
-## 📊 데이터베이스 스키마
-
-### 주요 테이블
-1. **companies**: 기업 정보
-2. **equipment**: 장비 정보
-3. **reservations**: 예약 정보
-4. **reservation_equipment**: 예약-장비 매핑 (N:N)
-
-### 뷰 (Views)
-1. **equipment_utilization**: 장비 가동률 통계
-2. **district_statistics**: 자치구별 통계
-3. **industry_statistics**: 업종별 통계
-4. **daily_reservations**: 일별 예약 현황
-
-## 🔒 보안
-
-- Row Level Security (RLS) 활성화
-- 인증된 사용자만 데이터 접근 가능
-- API 키는 환경 변수로 관리
-
-## 📱 반응형
-
-- 데스크탑 최적화 (1920px 기준)
-- 태블릿 대응 (768px+)
-
-## ✅ 완료된 기능
-
-- [x] 예약 생성/수정/삭제 모달
-- [x] 기업 CRUD (생성/수정/삭제)
-- [x] 장비 관리
-- [x] 통계 페이지 (차트, 필터, CSV 내보내기)
-- [x] 노쇼(No-Show) 처리 기능
-- [x] 커스텀 확인 모달 (브라우저 confirm 대체)
-- [x] Toast 알림 시스템
-- [x] 에러 바운더리
-- [x] Chrome Extension (SMBIZ 데이터 추출)
-- [x] 클립보드 붙여넣기로 예약 데이터 자동 입력
-
-## 🚧 개발 중인 기능
-
-- [ ] 드래그 앤 드롭 예약 변경
-- [ ] 실시간 알림
-- [ ] PDF 리포트 생성
-
-## 📝 라이센스
-
-MIT License
-
-## 👤 Contact
-
-문의사항이 있으시면 연락주세요.
+MIT

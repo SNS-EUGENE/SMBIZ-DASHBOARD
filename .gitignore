@@ -23,12 +23,35 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment variables
+# Environment variables (CRITICAL - contains API keys & credentials)
 .env
 .env.local
 .env.production
+
+# Claude Code / AI agent config (local only)
+.claude/
+.agents/
+
+# Temp & debug files
+tmp/
+nul
+scripts/.scrape-errors.log
+scripts/debug-*
 
 # Excel temp files
 excel_temp
 *.xlsx
 analyze_excel.py
+
+# Internal planning docs (not for repo)
+DEVELOPMENT_DIRECTION_PLAN_*.md
+MASTER_EXECUTION_CHECKLIST_*.md
+P0_UAT_QUICK_CHECK_*.md
+SMBIZ_SCRAPING_PLAN_*.md
+PROGRESS.md
+
+# Supabase local temp
+supabase/.temp/
+
+# Debug page (disabled)
+src/pages/DebugPage.tsx

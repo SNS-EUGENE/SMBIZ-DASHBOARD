@@ -152,6 +152,7 @@ interface DailyReservationView {
   district: string | null
   industry: string | null
   company_name: string | null
+  representative: string | null
   contact: string | null
 }
 
@@ -1037,6 +1038,7 @@ export const api = {
         reservationDate: r.reservation_date,
         timeSlot: r.time_slot,
         companyName: r.company_name || '(알 수 없음)',
+        representative: r.representative || '',
         contact: r.contact || '',
         survey: surveyMap.get(r.id) || null,
       }))
@@ -1430,6 +1432,46 @@ export const api = {
 
       const stats = Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date))
       return { data: stats, error: null }
+    },
+  },
+
+  // ── 이용자 준수사항 동의 ────────────────────────────────
+  compliance: {
+    /** 예약 ID로 동의서 조회 */
+    async getByReservationId(reservationId: string) {
+      const { data, error } = await supabase
+        .from('compliance_agreements')
+        .select('*')
+        .eq('reservation_id', reservationId)
+        .maybeSingle()
+      return { data, error }
+    },
+
+    /** 예약 ID 배열로 동의서 존재 여부 조회 */
+    async getByReservationIds(reservationIds: string[]) {
+      if (!reservationIds.length) return { data: [], error: null }
+      const { data, error } = await supabase
+        .from('compliance_agreements')
+        .select('*')
+        .in('reservation_id', reservationIds)
+      return { data: data || [], error }
+    },
+
+    /** 동의서 upsert (reservation_id 기준) */
+    async submit(input: {
+      reservation_id: string
+      agreed: boolean
+      signed_date: string
+      company_name: string
+      applicant_name: string
+      signature_data: string | null
+    }) {
+      const { data, error } = await supabase
+        .from('compliance_agreements')
+        .upsert(input, { onConflict: 'reservation_id' })
+        .select()
+        .single()
+      return { data, error }
     },
   },
 }

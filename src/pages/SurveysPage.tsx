@@ -209,6 +209,20 @@ const SurveysPage = (): ReactElement => {
                 {hasActiveFilters && ' · 필터 적용됨'}
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              <a
+                href="/survey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-ghost text-xs py-1.5 px-3 flex items-center gap-1.5 text-text-secondary hover:text-primary"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                <span className="hidden md:inline">만족도조사 페이지</span>
+              </a>
             <button className="btn btn-ghost text-sm p-1.5 md:py-1.5 md:px-3 flex items-center gap-1.5" onClick={fetchData} aria-label="새로고침">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10"/>
@@ -217,6 +231,7 @@ const SurveysPage = (): ReactElement => {
               </svg>
               <span className="hidden md:inline">새로고침</span>
             </button>
+            </div>
           </div>
         </div>
 

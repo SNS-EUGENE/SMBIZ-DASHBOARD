@@ -2,17 +2,19 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api } from '../lib/supabase'
 import { useToast } from '../components/Toast'
 import SurveySubmissionForm, { type SurveyReservationOption } from '../components/SurveySubmissionForm'
-import type { SatisfactionSurvey } from '../types'
+import ComplianceAgreementForm from '../components/ComplianceAgreementForm'
+import type { SatisfactionSurvey, ComplianceAgreement } from '../types'
 
 // ── 타입 ──────────────────────────────────────────────
 
-type PageStep = 'list' | 'pin' | 'survey' | 'done'
+type PageStep = 'list' | 'pin' | 'compliance' | 'survey' | 'done'
 
 interface ReservationCard {
   reservationId: string
   reservationDate: string
   timeSlot: string
   companyName: string
+  representative: string
   contact: string
   survey: SatisfactionSurvey | null
 }
@@ -137,9 +139,12 @@ const SurveyPage = () => {
     setStep('pin')
   }
 
+  // 동의서 상태
+  const [existingCompliance, setExistingCompliance] = useState<ComplianceAgreement | null>(null)
+
   // ── PIN 인증 ────────────────────────────
 
-  const handlePinSubmit = (e: FormEvent) => {
+  const handlePinSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!selectedCard) return
 
@@ -159,9 +164,20 @@ const SurveyPage = () => {
       return
     }
 
-    // 인증 성공 → 설문 단계
+    // 인증 성공 → 동의서 확인 후 분기
     setPinError(null)
-    setStep('survey')
+
+    // 기존 동의서 확인
+    const { data: existing } = await api.compliance.getByReservationId(selectedCard.reservationId)
+    setExistingCompliance(existing || null)
+
+    if (existing?.agreed) {
+      // 이미 동의 완료 → 바로 설문
+      setStep('survey')
+    } else {
+      // 동의 필요 → 동의 단계
+      setStep('compliance')
+    }
   }
 
   // ── 설문 완료 ───────────────────────────
@@ -178,6 +194,7 @@ const SurveyPage = () => {
     setSelectedCard(null)
     setPin('')
     setPinError(null)
+    setExistingCompliance(null)
     fetchReservations(currentDate)
   }
 
@@ -375,6 +392,45 @@ const SurveyPage = () => {
                 확인
               </button>
             </form>
+          </div>
+        )}
+
+        {/* ─── Step: 이용자 동의 ────────────────── */}
+        {step === 'compliance' && selectedCard && (
+          <div className="space-y-4">
+            <div className="card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="p-1.5 rounded-lg hover:bg-bg-tertiary transition text-text-secondary"
+                  aria-label="뒤로가기"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <h2 className="text-sm font-semibold text-text-primary">이용자 준수사항 동의</h2>
+              </div>
+              <div className="rounded-lg border border-border/70 bg-bg-tertiary/20 p-3">
+                <div className="text-sm font-medium text-text-primary">{selectedCard.companyName}</div>
+                <div className="text-xs text-text-secondary mt-0.5">
+                  {formatDateKR(selectedCard.reservationDate)} · {selectedCard.timeSlot === 'morning' ? '오전' : '오후'}
+                </div>
+              </div>
+            </div>
+
+            <ComplianceAgreementForm
+              reservationId={selectedCard.reservationId}
+              companyName={selectedCard.companyName}
+              applicantName={selectedCard.representative}
+              date={selectedCard.reservationDate}
+              hidePdfDownload
+              onSubmitted={() => {
+                toast.success('동의가 완료되었습니다. 만족도조사를 진행해주세요.')
+                setStep('survey')
+              }}
+            />
           </div>
         )}
 

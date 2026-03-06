@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef, Fragment, type ReactElement } from 'react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { api } from '../lib/supabase'
+import { api, supabase } from '../lib/supabase'
 import { exportCompanies } from '../lib/exportUtils'
 import Modal from '../components/Modal'
 import CompanyForm, { COMPANY_FORM_ID } from '../components/CompanyForm'
 import { useToast } from '../components/Toast'
 import type { Company } from '../types'
+
+interface CompanyStats {
+  count: number
+  lastDate: string
+}
 
 type TabId = 'list' | 'blocked'
 
@@ -28,6 +33,10 @@ const CompaniesPage = (): ReactElement => {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [allReservations, setAllReservations] = useState<{ company_id: string; reservation_date: string }[]>([])
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all')
+  const [companyStats, setCompanyStats] = useState<Map<string, CompanyStats>>(new Map())
+  const [allTimeStats, setAllTimeStats] = useState<Map<string, CompanyStats>>(new Map())
   const [showCompanyModal, setShowCompanyModal] = useState(false)
   const [formLoading, setFormLoading] = useState(false)
   const [editingCompany, setEditingCompany] = useState<Company | null>(null)
@@ -51,13 +60,63 @@ const CompaniesPage = (): ReactElement => {
     searchTimerRef.current = setTimeout(() => setDebouncedSearch(value), 300)
   }
 
+  // 예약 데이터에서 연도별 통계 계산
+  const computeStats = (
+    reservations: { company_id: string; reservation_date: string }[],
+    year: number | 'all'
+  ): Map<string, CompanyStats> => {
+    const filtered = year === 'all'
+      ? reservations
+      : reservations.filter((r) => r.reservation_date.startsWith(String(year)))
+    const statsMap = new Map<string, CompanyStats>()
+    filtered.forEach((r) => {
+      const existing = statsMap.get(r.company_id)
+      if (existing) {
+        existing.count++
+        if (r.reservation_date > existing.lastDate) existing.lastDate = r.reservation_date
+      } else {
+        statsMap.set(r.company_id, { count: 1, lastDate: r.reservation_date })
+      }
+    })
+    return statsMap
+  }
+
+  // 사용 가능한 연도 목록
+  const availableYears = (() => {
+    const years = new Set<number>()
+    allReservations.forEach((r) => {
+      const y = parseInt(r.reservation_date.substring(0, 4))
+      if (!isNaN(y)) years.add(y)
+    })
+    return Array.from(years).sort((a, b) => b - a)
+  })()
+
+  // 연도 변경 시 stats 재계산
+  useEffect(() => {
+    if (allReservations.length > 0) {
+      setCompanyStats(computeStats(allReservations, selectedYear))
+    }
+  }, [selectedYear, allReservations])
+
   const fetchData = async (): Promise<void> => {
     setLoading(true)
     try {
       if (activeTab === 'list') {
-        const { data, error } = await api.companies.getAll()
-        if (error) toast.error('기업 목록 조회 실패 : ' + error.message)
-        else setCompanies(data || [])
+        const [companyResult, reservationResult] = await Promise.all([
+          api.companies.getAll(),
+          supabase
+            .from('reservations')
+            .select('company_id, reservation_date')
+            .not('status', 'eq', 'cancelled'),
+        ])
+
+        if (companyResult.error) toast.error('기업 목록 조회 실패 : ' + companyResult.error.message)
+        else setCompanies(companyResult.data || [])
+
+        const rows = (reservationResult.data || []) as { company_id: string; reservation_date: string }[]
+        setAllReservations(rows)
+        setAllTimeStats(computeStats(rows, 'all'))
+        setCompanyStats(computeStats(rows, selectedYear))
       } else {
         const { data, error } = await api.companies.getBlocked()
         if (error) toast.error('차단 기업 조회 실패 : ' + error.message)
@@ -135,7 +194,7 @@ const CompaniesPage = (): ReactElement => {
       matchField(item.name, q) ||
       matchField(item.representative, q) ||
       matchField(item.industry, q) ||
-      matchField(item.district, q)
+      matchField(item.contact, q)
     )
   }
 
@@ -152,9 +211,64 @@ const CompaniesPage = (): ReactElement => {
   // Expandable row state (mobile)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  // Sort state
+  type SortField = 'count' | 'lastDate' | null
+  const [sortField, setSortField] = useState<SortField>(null)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
+  const toggleSort = (field: SortField): void => {
+    if (sortField === field) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortOrder('desc')
+    }
+  }
+
+  const SortArrow = ({ field }: { field: SortField }): ReactElement | null => {
+    if (sortField !== field) return (
+      <svg width="10" height="10" viewBox="0 0 10 10" className="opacity-30 ml-0.5 inline-block">
+        <path d="M5 2L8 5H2L5 2Z" fill="currentColor"/><path d="M5 8L2 5H8L5 8Z" fill="currentColor"/>
+      </svg>
+    )
+    return (
+      <svg width="10" height="10" viewBox="0 0 10 10" className="ml-0.5 inline-block text-primary">
+        {sortOrder === 'asc'
+          ? <path d="M5 2L8 6H2L5 2Z" fill="currentColor"/>
+          : <path d="M5 8L2 4H8L5 8Z" fill="currentColor"/>}
+      </svg>
+    )
+  }
+
+  const sortCompanies = (data: Company[]): Company[] => {
+    if (!sortField) return data
+    return [...data].sort((a, b) => {
+      let cmp = 0
+      if (sortField === 'count') {
+        // 예약 횟수는 항상 누계 기준
+        const sa = allTimeStats.get(a.id)
+        const sb = allTimeStats.get(b.id)
+        cmp = (sa?.count ?? 0) - (sb?.count ?? 0)
+      } else {
+        // 최근 예약은 연도 필터 기준
+        const sa = companyStats.get(a.id)
+        const sb = companyStats.get(b.id)
+        const da = sa?.lastDate ?? ''
+        const db = sb?.lastDate ?? ''
+        cmp = da.localeCompare(db)
+      }
+      return sortOrder === 'asc' ? cmp : -cmp
+    })
+  }
+
   // Tables
+  // 연도 필터 적용: 특정 연도 선택 시 해당 연도에 예약이 있는 기업만 표시
+  const yearFilteredCompanies = selectedYear === 'all'
+    ? companies
+    : companies.filter((c) => companyStats.has(c.id))
+
   const CompaniesTable = (): ReactElement => {
-    const filteredData = filterCompanies(companies, debouncedSearch)
+    const filteredData = sortCompanies(filterCompanies(yearFilteredCompanies, debouncedSearch))
     return (
       <div className="overflow-x-auto">
         <table className="table text-sm w-full">
@@ -165,13 +279,20 @@ const CompaniesPage = (): ReactElement => {
               <th className="col-left hidden md:table-cell">사업자번호</th>
               <th className="col-left hidden md:table-cell">업종</th>
               <th className="col-left">연락처</th>
-              <th className="col-left hidden md:table-cell">자치구</th>
+              <th className="col-center hidden md:table-cell cursor-pointer select-none hover:text-primary transition-colors" onClick={() => toggleSort('count')}>
+                예약 횟수 <SortArrow field="count" />
+              </th>
+              <th className="col-left hidden md:table-cell cursor-pointer select-none hover:text-primary transition-colors" onClick={() => toggleSort('lastDate')}>
+                최근 예약 <SortArrow field="lastDate" />
+              </th>
               <th className="col-center">작업</th>
             </tr>
           </thead>
           <tbody>
             {filteredData.map((company) => {
               const isExpanded = expandedId === company.id
+              const totalStats = allTimeStats.get(company.id)
+              const yearStats = companyStats.get(company.id)
               return (
                 <Fragment key={company.id}>
                   <tr
@@ -185,7 +306,16 @@ const CompaniesPage = (): ReactElement => {
                       <span className="badge badge-primary">{company.industry}</span>
                     </td>
                     <td className="col-left whitespace-nowrap">{company.contact || '-'}</td>
-                    <td className="col-left hidden md:table-cell">{company.district}</td>
+                    <td className="col-center hidden md:table-cell tabular-nums">
+                      {totalStats ? (
+                        <span className="font-semibold">{totalStats.count}</span>
+                      ) : (
+                        <span className="text-text-tertiary">0</span>
+                      )}
+                    </td>
+                    <td className="col-left hidden md:table-cell text-xs tabular-nums text-text-secondary">
+                      {yearStats ? format(new Date(yearStats.lastDate), 'yy.MM.dd') : '-'}
+                    </td>
                     <td className="col-center" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-1">
                         <button onClick={() => handleEditCompany(company)} className="btn-ghost text-xs px-1.5 py-0.5">수정</button>
@@ -209,12 +339,13 @@ const CompaniesPage = (): ReactElement => {
                             <span className="badge badge-primary text-[10px]">{company.industry}</span>
                           </div>
                         )}
-                        {company.district && (
-                          <div className="flex gap-2">
-                            <span className="text-text-tertiary w-16 flex-shrink-0">자치구</span>
-                            <span className="text-text-primary">{company.district}</span>
-                          </div>
-                        )}
+                        <div className="flex gap-2">
+                          <span className="text-text-tertiary w-16 flex-shrink-0">예약</span>
+                          <span className="text-text-primary">
+                            {totalStats ? `${totalStats.count}건` : '0건'}
+                            {yearStats ? ` (최근 ${format(new Date(yearStats.lastDate), 'yy.MM.dd')})` : ''}
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -316,7 +447,7 @@ const CompaniesPage = (): ReactElement => {
   )
 
   const tabs = [
-    { id: 'list' as TabId, label: '기업 목록', icon: BuildingIcon, count: companies.length },
+    { id: 'list' as TabId, label: '기업 목록', icon: BuildingIcon, count: yearFilteredCompanies.length },
     { id: 'blocked' as TabId, label: '차단 기업', icon: BlockIcon, count: blockedCompanies.length },
   ]
 
@@ -383,7 +514,7 @@ const CompaniesPage = (): ReactElement => {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs + Year filter */}
         <div className="px-4 md:px-6 flex items-center gap-0.5 md:gap-1 border-t border-border/50 overflow-x-auto">
           {tabs.map((tab) => {
             const IconComponent = tab.icon
@@ -410,6 +541,35 @@ const CompaniesPage = (): ReactElement => {
               </button>
             )
           })}
+
+          {/* Year filter (기업 목록 탭일 때만) */}
+          {activeTab === 'list' && availableYears.length > 0 && (
+            <div className="ml-auto flex items-center gap-1 pl-4">
+              <button
+                onClick={() => { setSelectedYear('all'); setSortField(null) }}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                  selectedYear === 'all'
+                    ? 'bg-primary/20 text-primary'
+                    : 'text-text-tertiary hover:text-text-secondary hover:bg-bg-tertiary'
+                }`}
+              >
+                전체
+              </button>
+              {availableYears.map((year) => (
+                <button
+                  key={year}
+                  onClick={() => { setSelectedYear(year); setSortField('lastDate'); setSortOrder('desc') }}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium tabular-nums transition-all ${
+                    selectedYear === year
+                      ? 'bg-primary/20 text-primary'
+                      : 'text-text-tertiary hover:text-text-secondary hover:bg-bg-tertiary'
+                  }`}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </header>
 

@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import Modal from './Modal'
 import SurveySubmissionForm, { type SurveyReservationOption } from './SurveySubmissionForm'
+import ComplianceAgreementForm from './ComplianceAgreementForm'
 import { api } from '../lib/supabase'
 import { RESERVATION_STATUS } from '../constants'
 import { fmtNum } from '../lib/utils'
-import type { SatisfactionSurvey } from '../types'
+import type { SatisfactionSurvey, ComplianceAgreement } from '../types'
 import { SURVEY_CATEGORY_LABELS, SATISFACTION_LEVEL_LABELS } from '../constants/survey'
 
 interface ReservationDetail {
@@ -49,11 +50,14 @@ const ReservationDetailModal = ({ isOpen, onClose, reservation }: ReservationDet
   const [survey, setSurvey] = useState<SatisfactionSurvey | null>(null)
   const [surveyLoading, setSurveyLoading] = useState(false)
   const [surveyNotConfigured, setSurveyNotConfigured] = useState(false)
-  const [activeTab, setActiveTab] = useState<'detail' | 'survey'>('detail')
+  const [compliance, setCompliance] = useState<ComplianceAgreement | null>(null)
+  const [complianceLoading, setComplianceLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<'detail' | 'compliance' | 'survey'>('detail')
 
   useEffect(() => {
     if (!isOpen || !reservation) {
       setSurvey(null)
+      setCompliance(null)
       setActiveTab('detail')
       return
     }
@@ -71,7 +75,15 @@ const ReservationDetailModal = ({ isOpen, onClose, reservation }: ReservationDet
       setSurveyLoading(false)
     }
 
+    const fetchCompliance = async () => {
+      setComplianceLoading(true)
+      const result = await api.compliance.getByReservationId(reservation.id)
+      setCompliance(result.data || null)
+      setComplianceLoading(false)
+    }
+
     fetchSurvey()
+    fetchCompliance()
   }, [isOpen, reservation])
 
   const surveyOptions: SurveyReservationOption[] = useMemo(() => {
@@ -114,6 +126,20 @@ const ReservationDetailModal = ({ isOpen, onClose, reservation }: ReservationDet
             }`}
           >
             예약 정보
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('compliance')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-all ${
+              activeTab === 'compliance'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            이용자 동의
+            {compliance && (
+              <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-success" />
+            )}
           </button>
           <button
             type="button"
@@ -275,6 +301,30 @@ const ReservationDetailModal = ({ isOpen, onClose, reservation }: ReservationDet
                     <p className="text-sm text-text-secondary whitespace-pre-wrap">{reservation.notes}</p>
                   </div>
                 </>
+              )}
+            </div>
+          )}
+
+          {/* Compliance Tab */}
+          {activeTab === 'compliance' && (
+            <div>
+              {complianceLoading ? (
+                <div className="text-center py-8">
+                  <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-text-tertiary">동의 데이터 조회 중...</p>
+                </div>
+              ) : (
+                <ComplianceAgreementForm
+                  reservationId={reservation.id}
+                  companyName={reservation.company_name || ''}
+                  applicantName={reservation.representative || ''}
+                  date={reservation.reservation_date}
+                  existingAgreement={compliance}
+                  onSubmitted={async () => {
+                    const result = await api.compliance.getByReservationId(reservation.id)
+                    setCompliance(result.data || null)
+                  }}
+                />
               )}
             </div>
           )}

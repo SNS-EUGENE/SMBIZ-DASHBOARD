@@ -155,6 +155,31 @@ export interface ReservationEquipment {
 }
 
 // ========================================
+// 이용자 준수사항 동의
+// ========================================
+
+export interface ComplianceAgreement {
+  id: string
+  reservation_id: string | null
+  agreed: boolean
+  signed_date: string
+  company_name: string
+  applicant_name: string
+  signature_data: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ComplianceAgreementInput {
+  reservation_id: string
+  agreed: boolean
+  signed_date: string
+  company_name: string
+  applicant_name: string
+  signature_data: string | null
+}
+
+// ========================================
 // Insert / Update 타입
 // ========================================
 
